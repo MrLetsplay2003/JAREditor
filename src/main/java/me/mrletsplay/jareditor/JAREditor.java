@@ -22,8 +22,10 @@ public class JAREditor extends Application {
 		URL url = JAREditor.class.getResource("/jareditor.fxml");
 		FXMLLoader loader = new FXMLLoader(url);
 		Parent p = loader.load(url.openStream());
-//		ClassEditorController c = loader.getController();
+		JAREditorController c = loader.getController();
+		c.init();
 		Scene scene = new Scene(p);
+		scene.getStylesheets().add(JAREditor.class.getResource("/keywords.css").toExternalForm());
 
 		primaryStage.setTitle("JAREditor");
 		primaryStage.setScene(scene);
