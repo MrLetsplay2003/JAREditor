@@ -44,15 +44,12 @@ public class ByteCodeFormatter {
 			case CHECKCAST:
 			case PUTFIELD:
 			case PUTSTATIC:
+			case GETFIELD:
+			case GETSTATIC:
 			{
 				ConstantPoolEntry e = cf.getConstantPool().getEntry(((i[0] & 0xFF) << 8) | i[1] & 0xFF);
 				b.append(formatConstantPoolEntry(cf, e));
 				break;
-			}
-			case GETFIELD:
-			case GETSTATIC:
-			{
-				// TODO
 			}
 			default:
 				return ByteUtils.bytesToHex(info.getInformation());
