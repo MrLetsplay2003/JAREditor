@@ -7,3 +7,8 @@
 	-fx-fill: red;
 	-fx-font-weight: bold;
 }
+
+.thingref {
+	-fx-fill: green;
+	-fx-font-style: italic;
+}
