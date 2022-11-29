@@ -11,11 +11,14 @@ import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.stage.Stage;
+import me.mrletsplay.mrcore.misc.classfile.ClassFile;
 
 public class JAREditor extends Application {
 
 	public static Path openFilePath;
 	public static FileSystem openFileSystem;
+
+	public static ClassFile editedClass;
 
 	@Override
 	public void start(Stage primaryStage) throws Exception {

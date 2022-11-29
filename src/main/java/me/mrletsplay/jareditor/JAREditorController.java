@@ -20,6 +20,7 @@ import javafx.fxml.FXML;
 import javafx.scene.control.SplitPane;
 import javafx.scene.control.TreeItem;
 import javafx.scene.control.TreeView;
+import me.mrletsplay.jareditor.format.ByteCodeParser;
 import me.mrletsplay.jareditor.format.ClassFileFormatter;
 import me.mrletsplay.jareditor.syntax.SyntaxHighlighting;
 import me.mrletsplay.mrcore.misc.classfile.ClassFile;
@@ -61,6 +62,7 @@ public class JAREditorController {
 				if(fullPath.endsWith(".class")) {
 					try {
 						ClassFile cf = new ClassFile(Files.newInputStream(p));
+						JAREditor.editedClass = cf;
 						areaEdit.replaceText(ClassFileFormatter.formatClass(cf));
 						areaEdit.moveTo(0);
 						areaEdit.requestFollowCaret();
@@ -84,6 +86,12 @@ public class JAREditorController {
 
 		JAREditor.openFile(jarFile);
 		add(root, JAREditor.openFileSystem, JAREditor.openFileSystem.getPath("/"));
+	}
+
+	@FXML
+	void save(ActionEvent event) {
+		String code = areaEdit.getText();
+		ByteCodeParser.parse(JAREditor.editedClass, code);
 	}
 
 	private void add(TreeItem<String> item, FileSystem fs, Path p) {
