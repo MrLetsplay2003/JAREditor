@@ -4,9 +4,13 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.AbstractMap;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
+import me.mrletsplay.jareditor.format.entity.ParserAttribute;
+import me.mrletsplay.jareditor.format.entity.ParserField;
 import me.mrletsplay.mrcore.misc.Result;
 import me.mrletsplay.mrcore.misc.classfile.ClassFile;
 
@@ -32,6 +36,20 @@ public class ByteCodeParser {
 				continue;
 			}
 
+			String token = parse.stripLeading().nextToken();
+			switch(token) {
+				case "field":
+				{
+					var field = readField(parse);
+					if(field.isErr()) return field.up();
+					break;
+				}
+				default:
+				{
+					return Result.err(new ParseError("Unexpected token '" + token + "'", parse.index));
+				}
+			}
+
 			break;
 		}
 
@@ -40,15 +58,102 @@ public class ByteCodeParser {
 
 	private static Result<Map.Entry<String, String>, ParseError> readPair(ParseString str) {
 		str.mark().stripLeading();
-		int i = 0;
-		while(i < str.remaining() && !Character.isWhitespace(str.peek(i))) i++;
-		String pair = str.next(i);
+		String pair = str.nextToken();
 		if(!pair.contains("=")) {
 			str.reset();
 			return Result.err(new ParseError("Pair needs to contain '='", str.index));
 		}
 		String[] kv = pair.split("=", 2);
 		return Result.of(new AbstractMap.SimpleEntry<>(kv[0], kv[1]));
+	}
+
+	private static Result<ParserField, ParseError> readField(ParseString str) {
+		str.mark().stripLeading();
+		String name = str.nextToken();
+		var block = readBlock(str);
+		if(block.isErr()) return block.up();
+		ParseString blk = new ParseString(block.value());
+		System.out.println(blk.str);
+
+		Map<String, String> properties = new HashMap<>();
+		List<ParserAttribute> attributes = new ArrayList<>();
+		while(true) {
+			var pair = readPair(blk);
+			if(!pair.isErr()) {
+				var kv = pair.value();
+				properties.put(kv.getKey(), kv.getValue());
+				continue;
+			}
+
+			String token = blk.stripLeading().nextToken();
+			System.out.println(token);
+			switch(token) {
+				case "attribute":
+				{
+					var attr = readAttribute(str);
+					if(attr.isErr()) return attr.up();
+					attributes.add(attr.value());
+					break;
+				}
+				default:
+				{
+					return Result.err(new ParseError("Unexpected token '" + token + "'", str.index + blk.index));
+				}
+			}
+
+			break;
+		}
+
+		return Result.of(new ParserField(name, properties, attributes));
+	}
+
+	private static Result<ParserAttribute, ParseError> readAttribute(ParseString str) {
+		str.mark().stripLeading();
+		String name = str.nextToken();
+		var block = readBlock(str);
+		if(block.isErr()) return block.up();
+		ParseString blk = new ParseString(block.value());
+		System.out.println(blk.str);
+
+		Map<String, String> properties = new HashMap<>();
+		List<ParserAttribute> attributes = new ArrayList<>();
+		String info = null;
+		while(true) {
+			var pair = readPair(blk);
+			if(!pair.isErr()) {
+				var kv = pair.value();
+				properties.put(kv.getKey(), kv.getValue());
+				continue;
+			}
+
+			String token = blk.stripLeading().nextToken();
+			System.out.println(token);
+			switch(token) {
+				case "attribute":
+				{
+					var attr = readAttribute(str);
+					if(attr.isErr()) return attr.up();
+					attributes.add(attr.value());
+					break;
+				}
+				case "info":
+				{
+					if(info != null) return Result.err(new ParseError("Duplicate info block", str.index));
+					var infoR = readBlock(str);
+					if(infoR.isErr()) return infoR.up();
+					info = infoR.value();
+					break;
+				}
+				default:
+				{
+					return Result.err(new ParseError("Unexpected token '" + token + "'", str.index + blk.index));
+				}
+			}
+
+			break;
+		}
+
+		return Result.of(new ParserAttribute(name, info, attributes));
 	}
 
 	private static Result<String, ParseError> readBlock(ParseString str) {
@@ -137,6 +242,13 @@ public class ByteCodeParser {
 
 		public int remaining() {
 			return str.length() - index;
+		}
+
+		public String nextToken() {
+			if(end()) throw new IllegalStateException("Reached end of input");
+			int i = 0;
+			while(i < remaining() && !Character.isWhitespace(peek(i))) i++;
+			return next(i);
 		}
 
 	}

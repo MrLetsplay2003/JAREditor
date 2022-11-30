@@ -91,7 +91,7 @@ public class JAREditorController {
 	@FXML
 	void save(ActionEvent event) {
 		String code = areaEdit.getText();
-		ByteCodeParser.parse(JAREditor.editedClass, code);
+		ByteCodeParser.parse(JAREditor.editedClass, code).get();
 	}
 
 	private void add(TreeItem<String> item, FileSystem fs, Path p) {

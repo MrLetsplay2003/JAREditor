@@ -25,7 +25,7 @@ public class SyntaxHighlighting {
 			.map(Pattern::quote)
 			.collect(Collectors.joining("|"));
 
-		List<String> additionalKWs = Arrays.asList("method", "attribute", "info");
+		List<String> additionalKWs = Arrays.asList("method", "attribute", "info", "field");
 		String additionalKW = additionalKWs.stream()
 			.map(Pattern::quote)
 			.collect(Collectors.joining("|"));
