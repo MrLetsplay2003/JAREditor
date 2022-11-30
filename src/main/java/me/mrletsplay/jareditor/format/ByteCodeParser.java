@@ -36,44 +36,63 @@ public class ByteCodeParser {
 				continue;
 			}
 
-			String token = parse.stripLeading().nextToken();
+			parse.stripLeading();
+			if(parse.end()) break;
+			String token = parse.nextToken();
+			if(token == null) return Result.err(new ParseError("Unexpected end of input", parse.index));
 			switch(token) {
 				case "field":
 				{
 					var field = readField(parse);
 					if(field.isErr()) return field.up();
-					break;
+					continue;
 				}
 				default:
 				{
 					return Result.err(new ParseError("Unexpected token '" + token + "'", parse.index));
 				}
 			}
-
-			break;
 		}
 
 		return Result.of(cf);
 	}
 
 	private static Result<Map.Entry<String, String>, ParseError> readPair(ParseString str) {
-		str.mark().stripLeading();
+		int m = str.mark();
+		str.stripLeading();
 		String pair = str.nextToken();
+		if(pair == null) {
+			str.reset(m);
+			return Result.err(new ParseError("Unexpected end of input", str.index));
+		}
+
 		if(!pair.contains("=")) {
-			str.reset();
+			str.reset(m);
 			return Result.err(new ParseError("Pair needs to contain '='", str.index));
 		}
+
 		String[] kv = pair.split("=", 2);
 		return Result.of(new AbstractMap.SimpleEntry<>(kv[0], kv[1]));
 	}
 
 	private static Result<ParserField, ParseError> readField(ParseString str) {
-		str.mark().stripLeading();
+		int m = str.mark();
+		str.stripLeading();
 		String name = str.nextToken();
+		if(name == null) {
+			str.reset(m);
+			return Result.err(new ParseError("Unexpected end of input", str.index));
+		}
+
 		var block = readBlock(str);
-		if(block.isErr()) return block.up();
+		if(block.isErr()) {
+			str.reset(m);
+			return block.up();
+		}
+
+		System.out.println(block.value().trim());
+
 		ParseString blk = new ParseString(block.value());
-		System.out.println(blk.str);
 
 		Map<String, String> properties = new HashMap<>();
 		List<ParserAttribute> attributes = new ArrayList<>();
@@ -85,18 +104,29 @@ public class ByteCodeParser {
 				continue;
 			}
 
-			String token = blk.stripLeading().nextToken();
-			System.out.println(token);
+			blk.stripLeading();
+			if(blk.end()) break;
+			String token = blk.nextToken();
+			if(token == null) {
+				str.reset(m);
+				return Result.err(new ParseError("Unexpected end of input", str.index + blk.index));
+			}
+
 			switch(token) {
 				case "attribute":
 				{
-					var attr = readAttribute(str);
-					if(attr.isErr()) return attr.up();
+					var attr = readAttribute(blk);
+					if(attr.isErr()) {
+						str.reset(m);
+						return attr.up();
+					}
+
 					attributes.add(attr.value());
 					break;
 				}
 				default:
 				{
+					str.reset(m);
 					return Result.err(new ParseError("Unexpected token '" + token + "'", str.index + blk.index));
 				}
 			}
@@ -108,12 +138,21 @@ public class ByteCodeParser {
 	}
 
 	private static Result<ParserAttribute, ParseError> readAttribute(ParseString str) {
-		str.mark().stripLeading();
+		int m = str.mark();
+		str.stripLeading();
 		String name = str.nextToken();
+		if(name == null) {
+			str.reset(m);
+			return Result.err(new ParseError("Unexpected end of input", str.index));
+		}
+
 		var block = readBlock(str);
-		if(block.isErr()) return block.up();
+		if(block.isErr()) {
+			str.reset(m);
+			return block.up();
+		}
+
 		ParseString blk = new ParseString(block.value());
-		System.out.println(blk.str);
 
 		Map<String, String> properties = new HashMap<>();
 		List<ParserAttribute> attributes = new ArrayList<>();
@@ -126,26 +165,41 @@ public class ByteCodeParser {
 				continue;
 			}
 
-			String token = blk.stripLeading().nextToken();
-			System.out.println(token);
+			blk.stripLeading();
+			if(blk.end()) break;
+			String token = blk.nextToken();
+			if(token == null) {
+				str.reset(m);
+				return Result.err(new ParseError("Unexpected end of input", str.index + blk.index));
+			}
+
 			switch(token) {
 				case "attribute":
 				{
-					var attr = readAttribute(str);
-					if(attr.isErr()) return attr.up();
+					var attr = readAttribute(blk);
+					if(attr.isErr()) {
+						str.reset(m);
+						return attr.up();
+					}
+
 					attributes.add(attr.value());
 					break;
 				}
 				case "info":
 				{
 					if(info != null) return Result.err(new ParseError("Duplicate info block", str.index));
-					var infoR = readBlock(str);
-					if(infoR.isErr()) return infoR.up();
+					var infoR = readBlock(blk);
+					if(infoR.isErr()) {
+						str.reset(m);
+						return infoR.up();
+					}
+
 					info = infoR.value();
 					break;
 				}
 				default:
 				{
+					str.reset(m);
 					return Result.err(new ParseError("Unexpected token '" + token + "'", str.index + blk.index));
 				}
 			}
@@ -157,9 +211,10 @@ public class ByteCodeParser {
 	}
 
 	private static Result<String, ParseError> readBlock(ParseString str) {
-		str.mark().stripLeading();
+		int m = str.mark();
+		str.stripLeading();
 		if(str.get() != '{') {
-			str.reset();
+			str.reset(m);
 			return Result.err(new ParseError("'{' expected", str.index));
 		}
 
@@ -177,7 +232,7 @@ public class ByteCodeParser {
 		}
 
 		if(i == str.remaining()) {
-			str.reset();
+			str.reset(m);
 			return Result.err(new ParseError("'}' expected", str.index + i));
 		}
 
@@ -190,33 +245,29 @@ public class ByteCodeParser {
 
 		private String str;
 		private int index;
-		private int mark = -1;
 
 		public ParseString(String str) {
 			this.str = str;
 		}
 
-		public ParseString mark() {
-			this.mark = index;
-			return this;
+		public int mark() {
+			return index;
 		}
 
-		public ParseString reset() {
-			if(mark == -1) throw new IllegalStateException("Mark not set");
+		public ParseString reset(int mark) {
 			this.index = mark;
-			this.mark = -1;
 			return this;
 		}
 
 		public char get() {
-			if(index >= str.length()) return 0;
+			if(index >= str.length()) throw new IllegalArgumentException("Read beyond end of string");
 			return str.charAt(index);
 		}
 
-		public char advance() {
+		public ParseString advance() {
+			if(end()) throw new IllegalArgumentException("Read beyond end of string");
 			index++;
-			if(end()) return 0;
-			return str.charAt(index);
+			return this;
 		}
 
 		public char peek(int count) {
@@ -245,7 +296,7 @@ public class ByteCodeParser {
 		}
 
 		public String nextToken() {
-			if(end()) throw new IllegalStateException("Reached end of input");
+			if(end()) return null;
 			int i = 0;
 			while(i < remaining() && !Character.isWhitespace(peek(i))) i++;
 			return next(i);
