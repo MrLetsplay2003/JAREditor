@@ -5,14 +5,20 @@ import java.util.Map;
 
 public class ParserField {
 
+	private int index;
 	private String name;
 	private Map<String, String> properties;
 	private List<ParserAttribute> attributes;
 
-	public ParserField(String name, Map<String, String> properties, List<ParserAttribute> attributes) {
+	public ParserField(int index, String name, Map<String, String> properties, List<ParserAttribute> attributes) {
+		this.index = index;
 		this.name = name;
 		this.properties = properties;
 		this.attributes = attributes;
+	}
+
+	public int getIndex() {
+		return index;
 	}
 
 	public String getName() {

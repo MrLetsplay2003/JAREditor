@@ -52,7 +52,7 @@ public class ByteCodeFormatter {
 				break;
 			}
 			default:
-				return ByteUtils.bytesToHex(info.getInformation());
+				return "0x" + ByteUtils.bytesToHex(info.getInformation());
 		}
 		return b;
 	}
@@ -96,7 +96,7 @@ public class ByteCodeFormatter {
 			}
 			default:
 			{
-				return ByteUtils.bytesToHex(ClassFileUtils.getShortBytes(cf.getConstantPool().indexOf(entry)));
+				return "0x" + ByteUtils.bytesToHex(ClassFileUtils.getShortBytes(cf.getConstantPool().indexOf(entry)));
 			}
 		}
 		return b;

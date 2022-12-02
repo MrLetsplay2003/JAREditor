@@ -26,6 +26,7 @@ public class ClassFileFormatter {
 			.map(f-> f.name().toLowerCase())
 			.collect(Collectors.joining(","))).append("\n\n");
 
+		for(Attribute a : cf.getAttributes()) b.append(formatAttribute(cf, a, 0));
 		for(ClassField f : cf.getFields()) b.append(formatField(cf, f, 0));
 		for(ClassMethod m : cf.getMethods()) b.append(formatMethod(cf, m, 0));
 
@@ -37,7 +38,7 @@ public class ClassFileFormatter {
 		b.append(indent(indent)).append("field ").append(field.getName().getValue()).append(" {\n");
 		b.append(indent(indent + 1)).append("descriptor=").append(field.getDescriptor().getValue()).append("\n");
 		b.append(indent(indent + 1)).append("flags=").append(field.getAccessFlags().getApplicable().stream()
-			.map(f-> f.name().toLowerCase())
+			.map(f -> f.name().toLowerCase())
 			.collect(Collectors.joining(","))).append("\n");
 		if(field.getAttributes().length != 0) b.append("\n");
 		for(Attribute a : field.getAttributes()) b.append(formatAttribute(cf, a, indent + 1));
@@ -80,7 +81,7 @@ public class ClassFileFormatter {
 			ByteCode bc = code.getCode();
 			b.append(ByteCodeFormatter.formatByteCode(cf, bc, indent + 1));
 		}else {
-			b.append(indent(indent + 1)).append(ByteUtils.bytesToHex(attr.getInfo())).append("\n");
+			b.append(indent(indent + 1)).append("0x" + ByteUtils.bytesToHex(attr.getInfo())).append("\n");
 		}
 		b.append(indent(indent)).append("}\n");
 		return b;

@@ -1,5 +1,7 @@
 package me.mrletsplay.jareditor;
 
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileSystem;
@@ -20,8 +22,8 @@ import javafx.fxml.FXML;
 import javafx.scene.control.SplitPane;
 import javafx.scene.control.TreeItem;
 import javafx.scene.control.TreeView;
-import me.mrletsplay.jareditor.format.ByteCodeParser;
 import me.mrletsplay.jareditor.format.ClassFileFormatter;
+import me.mrletsplay.jareditor.format.ClassFileParser;
 import me.mrletsplay.jareditor.syntax.SyntaxHighlighting;
 import me.mrletsplay.mrcore.misc.classfile.ClassFile;
 
@@ -91,7 +93,12 @@ public class JAREditorController {
 	@FXML
 	void save(ActionEvent event) {
 		String code = areaEdit.getText();
-		ByteCodeParser.parse(JAREditor.editedClass, code).get();
+		ClassFile cf = ClassFileParser.parse(JAREditor.editedClass, code).get();
+		try(FileOutputStream fOut = new FileOutputStream(new File("/home/mr/Desktop/testing/out.class"))) {
+			cf.write(fOut);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
 	}
 
 	private void add(TreeItem<String> item, FileSystem fs, Path p) {
