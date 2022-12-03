@@ -10,10 +10,13 @@ import javafx.application.Application;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
+import javafx.scene.image.Image;
 import javafx.stage.Stage;
 import me.mrletsplay.mrcore.misc.classfile.ClassFile;
 
 public class JAREditor extends Application {
+
+	public static Stage stage;
 
 	public static Path openFilePath;
 	public static FileSystem openFileSystem;
@@ -22,6 +25,8 @@ public class JAREditor extends Application {
 
 	@Override
 	public void start(Stage primaryStage) throws Exception {
+		stage = primaryStage;
+		stage.getIcons().add(new Image("/jareditor.png"));
 		URL url = JAREditor.class.getResource("/jareditor.fxml");
 		FXMLLoader loader = new FXMLLoader(url);
 		Parent p = loader.load(url.openStream());

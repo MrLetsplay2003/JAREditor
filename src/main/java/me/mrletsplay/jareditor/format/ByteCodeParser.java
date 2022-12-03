@@ -35,7 +35,7 @@ public class ByteCodeParser {
 				val = new byte[0];
 			}else {
 				val = parseInstructionArgument(cf, arg);
-				if(val == null) return Result.err(new ParseError("Invalid instruction argument", str.mark() - arg.length()));
+				if(val == null) return Result.err(new ParseError("Invalid instruction argument '" + arg + "'", str.mark() - arg.length()));
 			}
 
 			instrs.add(new InstructionInformation(i, val)); // TODO: validate byte count

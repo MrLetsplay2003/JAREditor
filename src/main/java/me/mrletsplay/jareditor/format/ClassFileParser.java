@@ -26,6 +26,7 @@ import me.mrletsplay.mrcore.misc.classfile.MethodAccessFlag;
 import me.mrletsplay.mrcore.misc.classfile.attribute.Attribute;
 import me.mrletsplay.mrcore.misc.classfile.attribute.AttributeCode;
 import me.mrletsplay.mrcore.misc.classfile.attribute.AttributeRaw;
+import me.mrletsplay.mrcore.misc.classfile.pool.entry.ConstantPoolClassEntry;
 import me.mrletsplay.mrcore.misc.classfile.util.ClassFileUtils;
 
 public class ClassFileParser {
@@ -37,7 +38,9 @@ public class ClassFileParser {
 		try {
 			original.write(bOut);
 			cf = new ClassFile(new ByteArrayInputStream(bOut.toByteArray()));
-		} catch (IOException ignored) {}
+		} catch (IOException ignored) {
+			throw new IllegalStateException("This should never happen", ignored);
+		}
 
 		ParseString parse = new FullParseString(str);
 
@@ -85,6 +88,32 @@ public class ClassFileParser {
 				}
 			}
 		}
+
+		String major = properties.get("major");
+		if(major == null) return Result.err(new ParseError("Missing major version", 0));
+		String minor = properties.get("minor");
+		if(minor == null) return Result.err(new ParseError("Missing minor version", 0));
+
+		try {
+			cf.setMajorVersion(Integer.parseInt(major));
+			cf.setMinorVersion(Integer.parseInt(minor));
+		}catch(NumberFormatException e) {
+			return Result.err(new ParseError("Invalid major/minor version", 0));
+		}
+
+		String superclass = properties.get("superclass");
+		if(superclass == null) return Result.err(new ParseError("Missing superclass", 0));
+		String interfaces = properties.get("interfaces");
+		if(interfaces == null) return Result.err(new ParseError("Missing interfaces", 0));
+
+		cf.setSuperClass(ClassFileUtils.getOrAppendClass(cf, ClassFileUtils.getOrAppendUTF8(cf, superclass)));
+		List<ConstantPoolClassEntry> ifs = new ArrayList<>();
+		if(!interfaces.isEmpty()) {
+			for(String s : interfaces.split(",")) {
+				ifs.add((ConstantPoolClassEntry) cf.getConstantPool().getEntry(ClassFileUtils.getOrAppendClass(cf, ClassFileUtils.getOrAppendUTF8(cf, s))));
+			}
+		}
+		cf.setInterfaces(ifs.toArray(ConstantPoolClassEntry[]::new));
 
 		List<Attribute> attrs = new ArrayList<>();
 		for(ParserAttribute a : attributes) {
@@ -202,6 +231,27 @@ public class ClassFileParser {
 							str.reset(m);
 							return c.up();
 						}
+
+						String locals = attr.getProperties().get("locals");
+						if(locals == null) {
+							str.reset(m);
+							return Result.err(new ParseError("Missing locals attribute", m));
+						}
+
+						String stack = attr.getProperties().get("stack");
+						if(stack == null) {
+							str.reset(m);
+							return Result.err(new ParseError("Missing stack attribute", m));
+						}
+
+						try {
+							code.setMaxLocals(Integer.parseInt(locals));
+							code.setMaxStack(Integer.parseInt(stack));
+						}catch(NumberFormatException e) {
+							str.reset(m);
+							return Result.err(new ParseError("Invalid number", m));
+						}
+
 						code.getCode().replace(c.value());
 						a = code;
 						break;
@@ -301,8 +351,6 @@ public class ClassFileParser {
 					return Result.err(new ParseError("Unexpected token '" + token + "'", str.mark() + blk.mark()));
 				}
 			}
-
-			break;
 		}
 
 		return Result.of(new ParserField(m, name, properties, attributes));
@@ -374,8 +422,6 @@ public class ClassFileParser {
 					return Result.err(new ParseError("Unexpected token '" + token + "'", str.mark() + blk.mark()));
 				}
 			}
-
-			break;
 		}
 
 		return Result.of(new ParserAttribute(name, info, properties, attributes));
@@ -434,8 +480,6 @@ public class ClassFileParser {
 					return Result.err(new ParseError("Unexpected token '" + token + "'", str.mark() + blk.mark()));
 				}
 			}
-
-			break;
 		}
 
 		return Result.of(new ParserMethod(m, name, properties, attributes));

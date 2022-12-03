@@ -17,6 +17,8 @@ public class ClassFileFormatter {
 	public static String formatClass(ClassFile cf) {
 		StringBuilder b = new StringBuilder();
 
+		b.append("major=").append(cf.getMajorVersion()).append("\n");
+		b.append("minor=").append(cf.getMinorVersion()).append("\n");
 		b.append("name=").append(cf.getThisClass().getName().getValue()).append("\n");
 		b.append("superclass=").append(cf.getSuperClass().getName().getValue()).append("\n");
 		b.append("interfaces=").append(Arrays.stream(cf.getInterfaces())
@@ -62,6 +64,13 @@ public class ClassFileFormatter {
 	private static CharSequence formatAttribute(ClassFile cf, Attribute attr, int indent) {
 		StringBuilder b = new StringBuilder();
 		b.append(indent(indent)).append("attribute ").append(attr.getNameString()).append(" {\n");
+
+		if(attr instanceof AttributeCode) {
+			AttributeCode c = (AttributeCode) attr;
+			b.append(indent(indent + 1)).append("locals=").append(c.getMaxLocals()).append("\n");
+			b.append(indent(indent + 1)).append("stack=").append(c.getMaxStack()).append("\n\n");
+		}
+
 		b.append(formatAttributeInfo(cf, attr, indent + 1));
 
 		if(!(attr instanceof AttributeRaw) && attr.getAttributes().length != 0) {

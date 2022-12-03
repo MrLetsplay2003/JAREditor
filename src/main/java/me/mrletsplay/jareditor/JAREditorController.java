@@ -7,7 +7,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.FileSystem;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -19,9 +18,13 @@ import org.fxmisc.richtext.CodeArea;
 
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
+import javafx.scene.control.Alert;
+import javafx.scene.control.Alert.AlertType;
 import javafx.scene.control.SplitPane;
 import javafx.scene.control.TreeItem;
 import javafx.scene.control.TreeView;
+import javafx.stage.FileChooser;
+import javafx.stage.FileChooser.ExtensionFilter;
 import me.mrletsplay.jareditor.format.ClassFileFormatter;
 import me.mrletsplay.jareditor.format.ClassFileParser;
 import me.mrletsplay.jareditor.syntax.SyntaxHighlighting;
@@ -45,12 +48,11 @@ public class JAREditorController {
 		areaEdit.textProperty().addListener((obs, oldValue, newValue) -> {
 			areaEdit.setStyleSpans(0, SyntaxHighlighting.computeHighlighting(areaEdit.getText()));
 		});
-	}
 
-	@FXML
-	void open(ActionEvent event) {
+
 		treeFiles.getSelectionModel().selectedItemProperty().addListener(v -> {
 			TreeItem<String> it = treeFiles.getSelectionModel().getSelectedItem();
+			if(it == null) return;
 			List<String> path = new ArrayList<>();
 			while(it != treeFiles.getRoot()) {
 				path.add(it.getValue());
@@ -79,8 +81,14 @@ public class JAREditorController {
 				e.printStackTrace();
 			}
 		});
+	}
 
-		Path jarFile = Paths.get("/home/mr/Downloads/MrCore-4.2-SNAPSHOT.jar");
+	@FXML
+	void open(ActionEvent event) {
+		FileChooser ch = new FileChooser();
+		ch.getExtensionFilters().add(new ExtensionFilter("Java archives", "*.jar", "*.war", "*.zip"));
+		File f = ch.showOpenDialog(JAREditor.stage);
+		Path jarFile = f.toPath();
 
 		TreeItem<String> root = new TreeItem<>(jarFile.getFileName().toString());
 		root.setExpanded(true);
@@ -93,8 +101,15 @@ public class JAREditorController {
 	@FXML
 	void save(ActionEvent event) {
 		String code = areaEdit.getText();
-		ClassFile cf = ClassFileParser.parse(JAREditor.editedClass, code).get();
-		try(FileOutputStream fOut = new FileOutputStream(new File("/home/mr/Desktop/testing/out.class"))) {
+		var p = ClassFileParser.parse(JAREditor.editedClass, code);
+		if(p.isErr()) {
+			Alert a = new Alert(AlertType.ERROR);
+			a.setContentText(p.getErr().toString());
+			a.show();
+			return;
+		}
+		ClassFile cf = p.value();
+		try(FileOutputStream fOut = new FileOutputStream(new File("/home/mr/Desktop/testing/HelloWorld.class"))) {
 			cf.write(fOut);
 		} catch (IOException e) {
 			e.printStackTrace();
