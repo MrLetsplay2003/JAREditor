@@ -1,0 +1,19 @@
+.highlight-bytecode {
+	-fx-fill: blue;
+	-fx-font-weight: bold;
+}
+
+.highlight-additional {
+	-fx-fill: red;
+	-fx-font-weight: bold;
+}
+
+.highlight-thingref {
+	-fx-fill: darkgreen;
+	/*-fx-font-style: italic;*/
+}
+
+.highlight-label {
+	-fx-fill: orangered;
+	-fx-font-weight: bold;
+}

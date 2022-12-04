@@ -32,10 +32,13 @@ public class SyntaxHighlighting {
 
 		String thingRef = "((?:(interface)?method|field):[^:\\s\\n]+\\:[^:\\s\\n]+\\:[^:\\s\\n]+|class:[^:\\s\\n]+)";
 
+		String label = "(label:[^:\\s\\n]+|[^:\\s\\n]+:)";
+
 		KEYWORD_PATTERN = Pattern.compile(
 			"(?<!\\S)((?<thingref>" + thingRef + ")|"
 			+ "(?<bytecode>" + bytecodeKW + ")|"
-			+ "(?<additional>" + additionalKW + "))(?!\\S)");
+			+ "(?<additional>" + additionalKW + ")|"
+			+ "(?<label>" + label + "))(?!\\S)");
 	}
 
 	public static StyleSpans<Collection<String>> computeHighlighting(String text) {
@@ -44,9 +47,10 @@ public class SyntaxHighlighting {
 		StyleSpansBuilder<Collection<String>> spansBuilder = new StyleSpansBuilder<>();
 		while (matcher.find()) {
 			String styleClass = null;
-			if(matcher.group("bytecode") != null) styleClass = "bytecode";
-			if(matcher.group("additional") != null) styleClass = "additional";
-			if(matcher.group("thingref") != null) styleClass = "thingref";
+			if(matcher.group("bytecode") != null) styleClass = "highlight-bytecode";
+			if(matcher.group("additional") != null) styleClass = "highlight-additional";
+			if(matcher.group("thingref") != null) styleClass = "highlight-thingref";
+			if(matcher.group("label") != null) styleClass = "highlight-label";
 			spansBuilder.add(Collections.emptyList(), matcher.start() - lastKwEnd);
 			spansBuilder.add(Collections.singleton(styleClass), matcher.end() - matcher.start());
 			lastKwEnd = matcher.end();

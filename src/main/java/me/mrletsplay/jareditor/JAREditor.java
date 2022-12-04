@@ -33,7 +33,7 @@ public class JAREditor extends Application {
 		JAREditorController c = loader.getController();
 		c.init();
 		Scene scene = new Scene(p);
-		scene.getStylesheets().add(JAREditor.class.getResource("/keywords.css").toExternalForm());
+		scene.getStylesheets().add(JAREditor.class.getResource("/highlight.css").toExternalForm());
 
 		primaryStage.setTitle("JAREditor");
 		primaryStage.setScene(scene);

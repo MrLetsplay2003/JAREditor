@@ -69,6 +69,7 @@ public class ClassFileFormatter {
 			AttributeCode c = (AttributeCode) attr;
 			b.append(indent(indent + 1)).append("locals=").append(c.getMaxLocals()).append("\n");
 			b.append(indent(indent + 1)).append("stack=").append(c.getMaxStack()).append("\n\n");
+			// TODO: exception table
 		}
 
 		b.append(formatAttributeInfo(cf, attr, indent + 1));
