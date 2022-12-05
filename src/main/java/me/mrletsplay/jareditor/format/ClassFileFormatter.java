@@ -11,6 +11,22 @@ import me.mrletsplay.mrcore.misc.classfile.ClassMethod;
 import me.mrletsplay.mrcore.misc.classfile.attribute.Attribute;
 import me.mrletsplay.mrcore.misc.classfile.attribute.AttributeCode;
 import me.mrletsplay.mrcore.misc.classfile.attribute.AttributeRaw;
+import me.mrletsplay.mrcore.misc.classfile.attribute.AttributeStackMapTable;
+import me.mrletsplay.mrcore.misc.classfile.attribute.stackmap.StackMapAppendFrame;
+import me.mrletsplay.mrcore.misc.classfile.attribute.stackmap.StackMapChopFrame;
+import me.mrletsplay.mrcore.misc.classfile.attribute.stackmap.StackMapFrame;
+import me.mrletsplay.mrcore.misc.classfile.attribute.stackmap.StackMapFullFrame;
+import me.mrletsplay.mrcore.misc.classfile.attribute.stackmap.StackMapSameLocals1StackItemFrame;
+import me.mrletsplay.mrcore.misc.classfile.attribute.stackmap.StackMapSameLocals1StackItemFrameExtended;
+import me.mrletsplay.mrcore.misc.classfile.attribute.stackmap.verification.VariableInfoObject;
+import me.mrletsplay.mrcore.misc.classfile.attribute.stackmap.verification.VariableInfoUninitialized;
+import me.mrletsplay.mrcore.misc.classfile.attribute.stackmap.verification.VerificationTypeInfo;
+import me.mrletsplay.mrcore.misc.classfile.pool.entry.ConstantPoolClassEntry;
+import me.mrletsplay.mrcore.misc.classfile.pool.entry.ConstantPoolEntry;
+import me.mrletsplay.mrcore.misc.classfile.pool.entry.ConstantPoolFieldRefEntry;
+import me.mrletsplay.mrcore.misc.classfile.pool.entry.ConstantPoolInterfaceMethodRefEntry;
+import me.mrletsplay.mrcore.misc.classfile.pool.entry.ConstantPoolMethodRefEntry;
+import me.mrletsplay.mrcore.misc.classfile.util.ClassFileUtils;
 
 public class ClassFileFormatter {
 
@@ -90,10 +106,140 @@ public class ClassFileFormatter {
 			AttributeCode code = (AttributeCode) attr;
 			ByteCode bc = code.getCode();
 			b.append(ByteCodeFormatter.formatByteCode(cf, bc, indent + 1));
+		}else if(attr instanceof AttributeStackMapTable) {
+			AttributeStackMapTable smt = (AttributeStackMapTable) attr;
+
+			for(StackMapFrame f : smt.getEntries()) {
+				b.append(indent(indent + 1)).append(f.getType().name().toLowerCase()).append(" {\n");
+				b.append(indent(indent + 2)).append("offset=").append(f.getOffsetDelta()).append("\n");
+				switch(f.getType()) {
+					case APPEND_FRAME:
+					{
+						StackMapAppendFrame fr = (StackMapAppendFrame) f;
+						b.append(indent(indent + 2)).append("types {\n");
+
+						for(VerificationTypeInfo i : fr.getAdditionalTypeInfo()) {
+							b.append(indent(indent + 3)).append(formatVerificationTypeInfo(cf, i)).append("\n");
+						}
+
+						b.append(indent(indent + 2)).append("}\n");
+						break;
+					}
+					case CHOP_FRAME:
+					{
+						StackMapChopFrame fr = (StackMapChopFrame) f;
+						b.append(indent(indent + 2)).append("absent=").append(fr.getNumAbsentLocals()).append("\n");
+						break;
+					}
+					case FULL_FRAME:
+					{
+						StackMapFullFrame fr = (StackMapFullFrame) f;
+						b.append(indent(indent + 2)).append("locals {\n");
+						for(VerificationTypeInfo i : fr.getLocals()) {
+							b.append(indent(indent + 3)).append(formatVerificationTypeInfo(cf, i)).append("\n");
+						}
+						b.append(indent(indent + 2)).append("}\n\n");
+
+						b.append(indent(indent + 2)).append("stack {\n");
+						for(VerificationTypeInfo i : fr.getStack()) {
+							b.append(indent(indent + 3)).append(formatVerificationTypeInfo(cf, i)).append("\n");
+						}
+						b.append(indent(indent + 2)).append("}\n");
+						break;
+					}
+					case SAME_LOCALS_1_STACK_ITEM_FRAME:
+					{
+						StackMapSameLocals1StackItemFrame fr = (StackMapSameLocals1StackItemFrame) f;
+						b.append(indent(indent + 3)).append("type=").append(formatVerificationTypeInfo(cf, fr.getTypeInfo())).append("\n");
+						break;
+					}
+					case SAME_LOCALS_1_STACK_ITEM_FRAME_EXTENDED:
+					{
+						StackMapSameLocals1StackItemFrameExtended fr = (StackMapSameLocals1StackItemFrameExtended) f;
+						b.append(indent(indent + 3)).append("type=").append(formatVerificationTypeInfo(cf, fr.getTypeInfo())).append("\n");
+						break;
+					}
+					case SAME_FRAME:
+					case SAME_FRAME_EXTENDED:
+					default:
+						break;
+				}
+				b.append(indent(indent + 1)).append("}\n\n");
+			}
 		}else {
 			b.append(indent(indent + 1)).append("0x" + ByteUtils.bytesToHex(attr.getInfo())).append("\n");
 		}
 		b.append(indent(indent)).append("}\n");
+		return b;
+	}
+
+	private static String formatVerificationTypeInfo(ClassFile cf, VerificationTypeInfo inf) {
+		switch(inf.getType()) {
+			case DOUBLE:
+			case FLOAT:
+			case INTEGER:
+			case LONG:
+			case NULL:
+			case TOP:
+			case UNINITIALIZED_THIS:
+				return inf.getType().name().toLowerCase();
+			case OBJECT:
+			{
+				VariableInfoObject i = (VariableInfoObject) inf;
+				return i.getType().name().toLowerCase() + ":" + i.getVariableType().as(ConstantPoolClassEntry.class).getName().getValue();
+			}
+			case UNINITIALIZED_VARIABLE:
+			{
+				VariableInfoUninitialized i = (VariableInfoUninitialized) inf;
+				return i.getType().name().toLowerCase() + ":0x" + ByteUtils.bytesToHex(ClassFileUtils.getShortBytes(i.getOffset()));
+			}
+			default:
+				throw new IllegalArgumentException("Unsupported type");
+		}
+	}
+
+	public static CharSequence formatConstantPoolEntry(ClassFile cf, ConstantPoolEntry entry) {
+		StringBuilder b = new StringBuilder();
+		switch(entry.getTag()) {
+			case METHOD_REF:
+			{
+				ConstantPoolMethodRefEntry e = (ConstantPoolMethodRefEntry) entry;
+				b.append("method:")
+					.append(e.getClassInfo().getName().getValue()).append(":")
+					.append(e.getNameAndType().getName().getValue()).append(":")
+					.append(e.getNameAndType().getDescriptor().getValue());
+				break;
+			}
+			case INTERFACE_METHOD_REF:
+			{
+				ConstantPoolInterfaceMethodRefEntry e = (ConstantPoolInterfaceMethodRefEntry) entry;
+				b.append("interfacemethod:")
+					.append(e.getClassInfo().getName().getValue()).append(":")
+					.append(e.getNameAndType().getName().getValue()).append(":")
+					.append(e.getNameAndType().getDescriptor().getValue());
+				break;
+			}
+			case CLASS:
+			{
+				ConstantPoolClassEntry e = (ConstantPoolClassEntry) entry;
+				b.append("class:")
+					.append(e.getName().getValue());
+				break;
+			}
+			case FIELD_REF:
+			{
+				ConstantPoolFieldRefEntry e = (ConstantPoolFieldRefEntry) entry;
+				b.append("field:")
+					.append(e.getClassInfo().getName().getValue()).append(":")
+					.append(e.getNameAndType().getName().getValue()).append(":")
+					.append(e.getNameAndType().getDescriptor().getValue());
+				break;
+			}
+			default:
+			{
+				return "0x" + ByteUtils.bytesToHex(ClassFileUtils.getShortBytes(cf.getConstantPool().indexOf(entry)));
+			}
+		}
 		return b;
 	}
 

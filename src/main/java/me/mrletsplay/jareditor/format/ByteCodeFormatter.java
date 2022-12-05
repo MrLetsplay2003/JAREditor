@@ -8,12 +8,7 @@ import me.mrletsplay.mrcore.misc.ByteUtils;
 import me.mrletsplay.mrcore.misc.classfile.ByteCode;
 import me.mrletsplay.mrcore.misc.classfile.ClassFile;
 import me.mrletsplay.mrcore.misc.classfile.InstructionInformation;
-import me.mrletsplay.mrcore.misc.classfile.pool.entry.ConstantPoolClassEntry;
 import me.mrletsplay.mrcore.misc.classfile.pool.entry.ConstantPoolEntry;
-import me.mrletsplay.mrcore.misc.classfile.pool.entry.ConstantPoolFieldRefEntry;
-import me.mrletsplay.mrcore.misc.classfile.pool.entry.ConstantPoolInterfaceMethodRefEntry;
-import me.mrletsplay.mrcore.misc.classfile.pool.entry.ConstantPoolMethodRefEntry;
-import me.mrletsplay.mrcore.misc.classfile.util.ClassFileUtils;
 
 public class ByteCodeFormatter {
 
@@ -112,7 +107,7 @@ public class ByteCodeFormatter {
 			case GETSTATIC:
 			{
 				ConstantPoolEntry e = cf.getConstantPool().getEntry(((i[0] & 0xFF) << 8) | i[1] & 0xFF);
-				b.append(formatConstantPoolEntry(cf, e));
+				b.append(ClassFileFormatter.formatConstantPoolEntry(cf, e));
 				break;
 			}
 			case GOTO:
@@ -129,51 +124,6 @@ public class ByteCodeFormatter {
 			}
 			default:
 				return "0x" + ByteUtils.bytesToHex(info.getInformation());
-		}
-		return b;
-	}
-
-	private static CharSequence formatConstantPoolEntry(ClassFile cf, ConstantPoolEntry entry) {
-		StringBuilder b = new StringBuilder();
-		switch(entry.getTag()) {
-			case METHOD_REF:
-			{
-				ConstantPoolMethodRefEntry e = (ConstantPoolMethodRefEntry) entry;
-				b.append("method:")
-					.append(e.getClassInfo().getName().getValue()).append(":")
-					.append(e.getNameAndType().getName().getValue()).append(":")
-					.append(e.getNameAndType().getDescriptor().getValue());
-				break;
-			}
-			case INTERFACE_METHOD_REF:
-			{
-				ConstantPoolInterfaceMethodRefEntry e = (ConstantPoolInterfaceMethodRefEntry) entry;
-				b.append("interfacemethod:")
-					.append(e.getClassInfo().getName().getValue()).append(":")
-					.append(e.getNameAndType().getName().getValue()).append(":")
-					.append(e.getNameAndType().getDescriptor().getValue());
-				break;
-			}
-			case CLASS:
-			{
-				ConstantPoolClassEntry e = (ConstantPoolClassEntry) entry;
-				b.append("class:")
-					.append(e.getName().getValue());
-				break;
-			}
-			case FIELD_REF:
-			{
-				ConstantPoolFieldRefEntry e = (ConstantPoolFieldRefEntry) entry;
-				b.append("field:")
-					.append(e.getClassInfo().getName().getValue()).append(":")
-					.append(e.getNameAndType().getName().getValue()).append(":")
-					.append(e.getNameAndType().getDescriptor().getValue());
-				break;
-			}
-			default:
-			{
-				return "0x" + ByteUtils.bytesToHex(ClassFileUtils.getShortBytes(cf.getConstantPool().indexOf(entry)));
-			}
 		}
 		return b;
 	}
