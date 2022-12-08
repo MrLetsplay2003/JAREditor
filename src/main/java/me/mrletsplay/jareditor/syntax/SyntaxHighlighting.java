@@ -25,12 +25,13 @@ public class SyntaxHighlighting {
 			.map(Pattern::quote)
 			.collect(Collectors.joining("|"));
 
-		List<String> additionalKWs = Arrays.asList("method", "attribute", "info", "field");
+		List<String> additionalKWs = Arrays.asList("method", "attribute", "info", "field", "constantpool");
 		String additionalKW = additionalKWs.stream()
 			.map(Pattern::quote)
 			.collect(Collectors.joining("|"));
 
-		String thingRef = "((?:(interface)?method|field):[^:\\s\\n]+\\:[^:\\s\\n]+\\:[^:\\s\\n]+|class:[^:\\s\\n]+)";
+		List<String> thingTypes = Arrays.asList("method", "field", "double", "float", "long", "integer", "utf8", "string", "class", "interfacemethod", "nameandtype", "methodhandle", "methodtype", "invokedynamic");
+		String thingRef = "((?:" + thingTypes.stream().collect(Collectors.joining("|")) + ")\\{[^\\n]+\\})";
 
 		String label = "(label:[^:\\s\\n]+|[^:\\s\\n]+:)";
 

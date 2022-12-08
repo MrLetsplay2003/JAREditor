@@ -22,10 +22,20 @@ import me.mrletsplay.mrcore.misc.classfile.attribute.stackmap.verification.Varia
 import me.mrletsplay.mrcore.misc.classfile.attribute.stackmap.verification.VariableInfoUninitialized;
 import me.mrletsplay.mrcore.misc.classfile.attribute.stackmap.verification.VerificationTypeInfo;
 import me.mrletsplay.mrcore.misc.classfile.pool.entry.ConstantPoolClassEntry;
+import me.mrletsplay.mrcore.misc.classfile.pool.entry.ConstantPoolDoubleEntry;
 import me.mrletsplay.mrcore.misc.classfile.pool.entry.ConstantPoolEntry;
 import me.mrletsplay.mrcore.misc.classfile.pool.entry.ConstantPoolFieldRefEntry;
+import me.mrletsplay.mrcore.misc.classfile.pool.entry.ConstantPoolFloatEntry;
+import me.mrletsplay.mrcore.misc.classfile.pool.entry.ConstantPoolIntegerEntry;
 import me.mrletsplay.mrcore.misc.classfile.pool.entry.ConstantPoolInterfaceMethodRefEntry;
+import me.mrletsplay.mrcore.misc.classfile.pool.entry.ConstantPoolInvokeDynamicEntry;
+import me.mrletsplay.mrcore.misc.classfile.pool.entry.ConstantPoolLongEntry;
+import me.mrletsplay.mrcore.misc.classfile.pool.entry.ConstantPoolMethodHandleEntry;
 import me.mrletsplay.mrcore.misc.classfile.pool.entry.ConstantPoolMethodRefEntry;
+import me.mrletsplay.mrcore.misc.classfile.pool.entry.ConstantPoolMethodTypeEntry;
+import me.mrletsplay.mrcore.misc.classfile.pool.entry.ConstantPoolNameAndTypeEntry;
+import me.mrletsplay.mrcore.misc.classfile.pool.entry.ConstantPoolStringEntry;
+import me.mrletsplay.mrcore.misc.classfile.pool.entry.ConstantPoolUTF8Entry;
 import me.mrletsplay.mrcore.misc.classfile.util.ClassFileUtils;
 
 public class ClassFileFormatter {
@@ -43,6 +53,12 @@ public class ClassFileFormatter {
 		b.append("flags=").append(cf.getAccessFlags().getApplicable().stream()
 			.map(f-> f.name().toLowerCase())
 			.collect(Collectors.joining(","))).append("\n\n");
+
+		b.append("constantpool {\n");
+		for(ConstantPoolEntry e : cf.getConstantPool().getEntries()) {
+			b.append(indent(1)).append(formatConstantPoolEntry(cf, e)).append("\n");
+		}
+		b.append("}\n\n");
 
 		for(Attribute a : cf.getAttributes()) b.append(formatAttribute(cf, a, 0));
 		for(ClassField f : cf.getFields()) b.append(formatField(cf, f, 0));
@@ -204,43 +220,146 @@ public class ClassFileFormatter {
 			case METHOD_REF:
 			{
 				ConstantPoolMethodRefEntry e = (ConstantPoolMethodRefEntry) entry;
-				b.append("method:")
+				b.append("method{")
 					.append(e.getClassInfo().getName().getValue()).append(":")
 					.append(e.getNameAndType().getName().getValue()).append(":")
-					.append(e.getNameAndType().getDescriptor().getValue());
+					.append(e.getNameAndType().getDescriptor().getValue())
+					.append("}");
 				break;
 			}
 			case INTERFACE_METHOD_REF:
 			{
 				ConstantPoolInterfaceMethodRefEntry e = (ConstantPoolInterfaceMethodRefEntry) entry;
-				b.append("interfacemethod:")
+				b.append("interfacemethod{")
 					.append(e.getClassInfo().getName().getValue()).append(":")
 					.append(e.getNameAndType().getName().getValue()).append(":")
-					.append(e.getNameAndType().getDescriptor().getValue());
+					.append(e.getNameAndType().getDescriptor().getValue())
+					.append("}");
 				break;
 			}
 			case CLASS:
 			{
 				ConstantPoolClassEntry e = (ConstantPoolClassEntry) entry;
-				b.append("class:")
-					.append(e.getName().getValue());
+				b.append("class{")
+					.append(e.getName().getValue())
+					.append("}");
 				break;
 			}
 			case FIELD_REF:
 			{
 				ConstantPoolFieldRefEntry e = (ConstantPoolFieldRefEntry) entry;
-				b.append("field:")
+				b.append("field{")
 					.append(e.getClassInfo().getName().getValue()).append(":")
 					.append(e.getNameAndType().getName().getValue()).append(":")
-					.append(e.getNameAndType().getDescriptor().getValue());
+					.append(e.getNameAndType().getDescriptor().getValue())
+					.append("}");
+				break;
+			}
+			case DOUBLE:
+			{
+				ConstantPoolDoubleEntry e = (ConstantPoolDoubleEntry) entry;
+				b.append("double{")
+					.append(e.getValue())
+					.append("}");
+				break;
+			}
+			case FLOAT:
+			{
+				ConstantPoolFloatEntry e = (ConstantPoolFloatEntry) entry;
+				b.append("float{")
+					.append(e.getValue())
+					.append("}");
+				break;
+			}
+			case INTEGER:
+			{
+				ConstantPoolIntegerEntry e = (ConstantPoolIntegerEntry) entry;
+				b.append("integer{")
+					.append(e.getValue())
+					.append("}");
+				break;
+			}
+			case INVOKE_DYNAMIC:
+			{
+				ConstantPoolInvokeDynamicEntry e = (ConstantPoolInvokeDynamicEntry) entry;
+				b.append("invokedynamic{")
+					.append(e.getBootstrapMethodAttributeIndex()).append(":")
+					.append(e.getNameAndType().getName().getValue()).append(":")
+					.append(e.getNameAndType().getDescriptor().getValue())
+					.append("}");
+				break;
+			}
+			case LONG:
+			{
+				ConstantPoolLongEntry e = (ConstantPoolLongEntry) entry;
+				b.append("long{")
+					.append(e.getValue())
+					.append("}");
+				break;
+			}
+			case METHOD_HANDLE:
+			{
+				ConstantPoolMethodHandleEntry e = (ConstantPoolMethodHandleEntry) entry;
+				b.append("methodhandle{")
+					.append(e.getReferenceType().name().toLowerCase()).append(":")
+					.append(formatConstantPoolEntry(cf, e.getReference()))
+					.append("}");
+				break;
+			}
+			case METHOD_TYPE:
+			{
+				ConstantPoolMethodTypeEntry e = (ConstantPoolMethodTypeEntry) entry;
+				b.append("methodtype{")
+					.append(e.getDescriptor().getValue())
+					.append("}");
+				break;
+			}
+			case NAME_AND_TYPE:
+			{
+				ConstantPoolNameAndTypeEntry e = (ConstantPoolNameAndTypeEntry) entry;
+				b.append("nameandtype{")
+					.append(e.getName().getValue()).append(":")
+					.append(e.getDescriptor().getValue())
+					.append("}");
+				break;
+			}
+			case STRING:
+			{
+				ConstantPoolStringEntry e = (ConstantPoolStringEntry) entry;
+				b.append("string{")
+					.append(escape(e.getString().getValue()))
+					.append("}");
+				break;
+			}
+			case UTF_8:
+			{
+				ConstantPoolUTF8Entry e = (ConstantPoolUTF8Entry) entry;
+				b.append("utf8{")
+					.append(escape(e.getValue()))
+					.append("}");
 				break;
 			}
 			default:
-			{
-				return "0x" + ByteUtils.bytesToHex(ClassFileUtils.getShortBytes(cf.getConstantPool().indexOf(entry)));
-			}
+				throw new IllegalArgumentException("Unsupported constant pool entry tag '" + entry.getTag() + "'");
 		}
 		return b;
+	}
+
+	private static CharSequence escape(char c) {
+		switch(c) {
+			case '{':
+				return "\\{";
+			case '}':
+				return "\\}";
+			default:
+				return String.valueOf(c);
+		}
+	}
+
+	private static CharSequence escape(String str) {
+		StringBuilder escaped = new StringBuilder();
+		for(char c : str.toCharArray()) escaped.append(escape(c));
+		return escaped;
 	}
 
 	private static CharSequence indent(int n) {

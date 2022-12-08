@@ -88,6 +88,7 @@ public class JAREditorController {
 		FileChooser ch = new FileChooser();
 		ch.getExtensionFilters().add(new ExtensionFilter("Java archives", "*.jar", "*.war", "*.zip"));
 		File f = ch.showOpenDialog(JAREditor.stage);
+		if(f == null) return;
 		Path jarFile = f.toPath();
 
 		TreeItem<String> root = new TreeItem<>(jarFile.getFileName().toString());

@@ -27,6 +27,7 @@ import me.mrletsplay.mrcore.misc.classfile.attribute.Attribute;
 import me.mrletsplay.mrcore.misc.classfile.attribute.AttributeCode;
 import me.mrletsplay.mrcore.misc.classfile.attribute.AttributeRaw;
 import me.mrletsplay.mrcore.misc.classfile.pool.entry.ConstantPoolClassEntry;
+import me.mrletsplay.mrcore.misc.classfile.pool.entry.ConstantPoolEntry;
 import me.mrletsplay.mrcore.misc.classfile.util.ClassFileUtils;
 
 public class ClassFileParser {
@@ -515,6 +516,94 @@ public class ClassFileParser {
 		ParseString block = str.sub(i - 1);
 		str.advance(i);
 		return Result.of(block);
+	}
+
+	private static Result<ConstantPoolEntry, ParseError> parseConstantPoolEntry(ClassFile cf, ParseString str) {
+		int m = str.mark();
+		str.stripLeading();
+		if(str.end()) {
+			str.reset(m);
+			return Result.err(new ParseError("Unexpected end of input", m));
+		}
+
+		int i = 0;
+		while(i < str.remaining() && str.get() != '{') i++;
+
+		if(str.end()) {
+			str.reset(m);
+			return Result.err(new ParseError("Unexpected end of input", m));
+		}
+
+		str.advance();
+		String tag = str.next(i);
+		String content = str.nextToken();
+		String[] spl = content.split(":");
+
+		int idx;
+		// TODO: checks
+		switch(tag) {
+			case "class":
+			{
+				idx = ClassFileUtils.getOrAppendClass(cf, ClassFileUtils.getOrAppendUTF8(cf, spl[1]));
+				break;
+			}
+			case "field":
+			{
+				idx = ClassFileUtils.getOrAppendMethodRef(cf,
+					ClassFileUtils.getOrAppendClass(cf, ClassFileUtils.getOrAppendUTF8(cf, spl[1])),
+					ClassFileUtils.getOrAppendNameAndType(cf,
+						ClassFileUtils.getOrAppendUTF8(cf, spl[2]),
+						ClassFileUtils.getOrAppendUTF8(cf, spl[3])));
+				break;
+			}
+			case "method":
+			{
+				idx = ClassFileUtils.getOrAppendMethodRef(cf,
+					ClassFileUtils.getOrAppendClass(cf, ClassFileUtils.getOrAppendUTF8(cf, spl[1])),
+					ClassFileUtils.getOrAppendNameAndType(cf,
+						ClassFileUtils.getOrAppendUTF8(cf, spl[2]),
+						ClassFileUtils.getOrAppendUTF8(cf, spl[3])));
+				break;
+			}
+			case "interfacemethod":
+			{
+				idx = ClassFileUtils.getOrAppendMethodRef(cf,
+					ClassFileUtils.getOrAppendClass(cf, ClassFileUtils.getOrAppendUTF8(cf, spl[1])),
+					ClassFileUtils.getOrAppendNameAndType(cf,
+						ClassFileUtils.getOrAppendUTF8(cf, spl[2]),
+						ClassFileUtils.getOrAppendUTF8(cf, spl[3])));
+				break;
+			}
+			case "string":
+			{
+				idx = ClassFileUtils.getOrAppendString(cf, spl[0]);
+				break;
+			}
+			case "integer":
+			{
+				idx = ClassFileUtils.getOrAppendInteger(cf, Integer.parseInt(spl[0]));
+				break;
+			}
+			case "float":
+			{
+				idx = ClassFileUtils.getOrAppendFloat(cf, Float.parseFloat(spl[0]));
+				break;
+			}
+			case "long":
+			{
+				idx = ClassFileUtils.getOrAppendLong(cf, Long.parseLong(spl[0]));
+				break;
+			}
+			case "nameandtype":
+			{
+				idx = ClassFileUtils.getOrAppendLong(cf, Long.parseLong(spl[0]));
+				break;
+			}
+			default:
+				str.reset(m);
+				return Result.err(new ParseError("Invalid constant pool tag '" + tag + "'", str.mark()));
+		}
+		return Result.of(cf.getConstantPool().getEntry(idx));
 	}
 
 }
