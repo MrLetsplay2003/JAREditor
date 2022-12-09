@@ -45,6 +45,7 @@ public class ClassFileParser {
 
 		ParseString parse = new FullParseString(str);
 
+		List<ConstantPoolEntry> constantPool = null;
 		Map<String, String> properties = new HashMap<>();
 		List<ParserAttribute> attributes = new ArrayList<>();
 		List<ParserField> fields = new ArrayList<>();
@@ -62,6 +63,14 @@ public class ClassFileParser {
 			String token = parse.nextToken();
 			if(token == null) return Result.err(new ParseError("Unexpected end of input", parse.mark()));
 			switch(token) {
+				case "constantpool":
+				{
+					var cp = readConstantPool(cf, parse);
+					if(cp.isErr()) return cp.up();
+					if(constantPool != null) return Result.err(new ParseError("Duplicate constant pool", parse.mark()));
+					constantPool = cp.value();
+					continue;
+				}
 				case "attribute":
 				{
 					var attr = readAttribute(parse);
@@ -299,6 +308,33 @@ public class ClassFileParser {
 		return Result.of(new AbstractMap.SimpleEntry<>(kv[0], kv[1]));
 	}
 
+	private static Result<List<ConstantPoolEntry>, ParseError> readConstantPool(ClassFile cf, ParseString str) {
+		int m = str.mark();
+		str.stripLeading();
+
+		var block = readBlock(str);
+		if(block.isErr()) {
+			str.reset(m);
+			return block.up();
+		}
+
+		List<ConstantPoolEntry> entries = new ArrayList<>();
+		ParseString blk = block.value();
+		while(true) {
+			ParseString token = blk.stripLeading().nextParseToken();
+			if(token == null) break;
+
+			var en = parseConstantPoolEntry(cf, token);
+			if(en.isErr()) {
+				str.reset(m);
+				return en.up();
+			}
+
+			entries.add(en.value());
+		}
+		return Result.of(entries);
+	}
+
 	private static Result<ParserField, ParseError> readField(ParseString str) {
 		int m = str.mark();
 		str.stripLeading();
@@ -527,16 +563,26 @@ public class ClassFileParser {
 		}
 
 		int i = 0;
-		while(i < str.remaining() && str.get() != '{') i++;
+		while(i < str.remaining() && str.peek(i) != '{') i++;
 
 		if(str.end()) {
 			str.reset(m);
 			return Result.err(new ParseError("Unexpected end of input", m));
 		}
 
-		str.advance();
 		String tag = str.next(i);
-		String content = str.nextToken();
+		String content = str.nextToken().substring(1);
+		if(!content.endsWith("}")) {
+			str.reset(m);
+			return Result.err(new ParseError("Unexpected end of input", m));
+		}
+		content = content.substring(0, content.length() - 1);
+
+		if(content == null) {
+			str.reset(m);
+			return Result.err(new ParseError("Unexpected end of input", m));
+		}
+
 		String[] spl = content.split(":");
 
 		int idx;
@@ -544,34 +590,39 @@ public class ClassFileParser {
 		switch(tag) {
 			case "class":
 			{
-				idx = ClassFileUtils.getOrAppendClass(cf, ClassFileUtils.getOrAppendUTF8(cf, spl[1]));
+				idx = ClassFileUtils.getOrAppendClass(cf, ClassFileUtils.getOrAppendUTF8(cf, spl[0]));
 				break;
 			}
 			case "field":
 			{
 				idx = ClassFileUtils.getOrAppendMethodRef(cf,
-					ClassFileUtils.getOrAppendClass(cf, ClassFileUtils.getOrAppendUTF8(cf, spl[1])),
+					ClassFileUtils.getOrAppendClass(cf, ClassFileUtils.getOrAppendUTF8(cf, spl[0])),
 					ClassFileUtils.getOrAppendNameAndType(cf,
-						ClassFileUtils.getOrAppendUTF8(cf, spl[2]),
-						ClassFileUtils.getOrAppendUTF8(cf, spl[3])));
+						ClassFileUtils.getOrAppendUTF8(cf, spl[1]),
+						ClassFileUtils.getOrAppendUTF8(cf, spl[2])));
 				break;
 			}
 			case "method":
 			{
 				idx = ClassFileUtils.getOrAppendMethodRef(cf,
-					ClassFileUtils.getOrAppendClass(cf, ClassFileUtils.getOrAppendUTF8(cf, spl[1])),
+					ClassFileUtils.getOrAppendClass(cf, ClassFileUtils.getOrAppendUTF8(cf, spl[0])),
 					ClassFileUtils.getOrAppendNameAndType(cf,
-						ClassFileUtils.getOrAppendUTF8(cf, spl[2]),
-						ClassFileUtils.getOrAppendUTF8(cf, spl[3])));
+						ClassFileUtils.getOrAppendUTF8(cf, spl[1]),
+						ClassFileUtils.getOrAppendUTF8(cf, spl[2])));
 				break;
 			}
 			case "interfacemethod":
 			{
 				idx = ClassFileUtils.getOrAppendMethodRef(cf,
-					ClassFileUtils.getOrAppendClass(cf, ClassFileUtils.getOrAppendUTF8(cf, spl[1])),
+					ClassFileUtils.getOrAppendClass(cf, ClassFileUtils.getOrAppendUTF8(cf, spl[0])),
 					ClassFileUtils.getOrAppendNameAndType(cf,
-						ClassFileUtils.getOrAppendUTF8(cf, spl[2]),
-						ClassFileUtils.getOrAppendUTF8(cf, spl[3])));
+						ClassFileUtils.getOrAppendUTF8(cf, spl[1]),
+						ClassFileUtils.getOrAppendUTF8(cf, spl[2])));
+				break;
+			}
+			case "utf8":
+			{
+				idx = ClassFileUtils.getOrAppendUTF8(cf, spl[0]);
 				break;
 			}
 			case "string":
@@ -596,7 +647,9 @@ public class ClassFileParser {
 			}
 			case "nameandtype":
 			{
-				idx = ClassFileUtils.getOrAppendLong(cf, Long.parseLong(spl[0]));
+				idx = ClassFileUtils.getOrAppendLong(cf, ClassFileUtils.getOrAppendNameAndType(cf,
+					ClassFileUtils.getOrAppendUTF8(cf, spl[0]),
+					ClassFileUtils.getOrAppendUTF8(cf, spl[1])));
 				break;
 			}
 			default:

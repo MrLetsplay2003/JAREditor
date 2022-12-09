@@ -105,6 +105,7 @@ public class JAREditorController {
 		var p = ClassFileParser.parse(JAREditor.editedClass, code);
 		if(p.isErr()) {
 			Alert a = new Alert(AlertType.ERROR);
+			System.out.println(code.substring(p.getErr().getIndex()));
 			a.setContentText(p.getErr().toString());
 			a.show();
 			return;

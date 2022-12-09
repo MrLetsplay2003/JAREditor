@@ -32,4 +32,13 @@ public interface ParseString {
 		return next(i);
 	}
 
+	public default ParseString nextParseToken() {
+		if(end()) return null;
+		int i = 0;
+		while(i < remaining() && !Character.isWhitespace(peek(i))) i++;
+		ParseString str = sub(i);
+		advance(i);
+		return str;
+	}
+
 }
