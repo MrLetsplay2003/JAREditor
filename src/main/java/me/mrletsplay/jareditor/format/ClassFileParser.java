@@ -320,18 +320,24 @@ public class ClassFileParser {
 
 		List<ConstantPoolEntry> entries = new ArrayList<>();
 		ParseString blk = block.value();
+		Result<ConstantPoolEntry, ParseError> err;
 		while(true) {
-			ParseString token = blk.stripLeading().nextParseToken();
-			if(token == null) break;
-
-			var en = parseConstantPoolEntry(cf, token);
+			blk.stripLeading();
+			var en = parseConstantPoolEntry(cf, blk);
 			if(en.isErr()) {
+				err = en;
 				str.reset(m);
-				return en.up();
+				break;
 			}
 
 			entries.add(en.value());
 		}
+
+		if(!blk.end()) {
+			str.reset(m);
+			return err.up();
+		}
+
 		return Result.of(entries);
 	}
 
@@ -571,22 +577,25 @@ public class ClassFileParser {
 		}
 
 		String tag = str.next(i);
-		String content = str.nextToken().substring(1);
-		if(!content.endsWith("}")) {
+		str.advance();
+		System.out.println("TAG: " + tag);
+
+		i = 0;
+		while(i < str.remaining() && str.peek(i) != '}') i++;
+
+		if(str.end()) {
 			str.reset(m);
 			return Result.err(new ParseError("Unexpected end of input", m));
 		}
-		content = content.substring(0, content.length() - 1);
 
-		if(content == null) {
-			str.reset(m);
-			return Result.err(new ParseError("Unexpected end of input", m));
-		}
-
+		String content = str.next(i);
+		str.advance();
+		System.out.println("CONTENT: " + content);
+		content = content.substring(1, content.length() - 1);
 		String[] spl = content.split(":");
 
 		int idx;
-		// TODO: checks
+		// TODO: checks, allow escaping
 		switch(tag) {
 			case "class":
 			{

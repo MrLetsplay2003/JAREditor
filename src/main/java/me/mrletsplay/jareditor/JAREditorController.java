@@ -108,6 +108,7 @@ public class JAREditorController {
 			System.out.println(code.substring(p.getErr().getIndex()));
 			a.setContentText(p.getErr().toString());
 			a.show();
+			p.getErr().printStackTrace();
 			return;
 		}
 		ClassFile cf = p.value();
