@@ -326,7 +326,6 @@ public class ClassFileParser {
 			var en = parseConstantPoolEntry(cf, blk);
 			if(en.isErr()) {
 				err = en;
-				str.reset(m);
 				break;
 			}
 

@@ -74,6 +74,7 @@ public class ByteCodeParser {
 	}
 
 	private static byte[] parseInstructionArgument(ClassFile cf, String str, int idx, Map<Integer, String> toResolve) {
+		// TODO: update to use constant pool format
 		if(str.startsWith("0x")) {
 			try {
 				return ByteUtils.hexToBytes(str.substring(2));
