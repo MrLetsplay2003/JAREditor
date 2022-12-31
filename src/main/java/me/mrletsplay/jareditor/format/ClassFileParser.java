@@ -559,7 +559,7 @@ public class ClassFileParser {
 		return Result.of(block);
 	}
 
-	private static Result<ConstantPoolEntry, ParseError> parseConstantPoolEntry(ClassFile cf, ParseString str) {
+	public static Result<ConstantPoolEntry, ParseError> parseConstantPoolEntry(ClassFile cf, ParseString str) {
 		int m = str.mark();
 		str.stripLeading();
 		if(str.end()) {
@@ -570,14 +570,13 @@ public class ClassFileParser {
 		int i = 0;
 		while(i < str.remaining() && str.peek(i) != '{') i++;
 
+		String tag = str.next(i);
 		if(str.end()) {
 			str.reset(m);
 			return Result.err(new ParseError("Unexpected end of input", m));
 		}
 
-		String tag = str.next(i);
 		str.advance();
-		System.out.println("TAG: " + tag);
 
 		i = 0;
 		while(i < str.remaining() && str.peek(i) != '}') i++;
@@ -589,7 +588,6 @@ public class ClassFileParser {
 
 		String content = str.next(i);
 		str.advance();
-		System.out.println("CONTENT: " + content);
 		content = content.substring(1, content.length() - 1);
 		String[] spl = content.split(":");
 

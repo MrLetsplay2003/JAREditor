@@ -38,18 +38,20 @@ public class ByteCodeParser {
 			try {
 				i = Instruction.valueOf(instr.toUpperCase());
 			}catch(IllegalArgumentException e) {
-				return Result.err(new ParseError("Invalid instruction", str.mark() - instr.length()));
+				return Result.err(new ParseError("Invalid instruction '" + instr + "'", str.mark() - instr.length()));
 			}
 
 			int j = 0;
 			while(j < str.remaining() && str.peek(j) != '\n') j++;
-			String arg = str.next(j).trim();
+			ParseString arg = str.sub(j).stripLeading();
 			byte[] val;
-			if(arg.isEmpty()) {
+			if(arg.end()) {
 				val = new byte[0];
 			}else {
-				val = parseInstructionArgument(cf, arg, instrs.size(), toResolve);
-				if(val == null) return Result.err(new ParseError("Invalid instruction argument '" + arg + "'", str.mark() - arg.length()));
+				var parsed = parseInstructionArgument(cf, arg, instrs.size(), toResolve);
+				if(parsed.isErr()) return parsed.up();
+				str.advance(j);
+				val = parsed.value();
 			}
 
 			InstructionInformation ii = new InstructionInformation(i, val);
@@ -73,59 +75,19 @@ public class ByteCodeParser {
 		return Result.of(ByteCode.of(instrs));
 	}
 
-	private static byte[] parseInstructionArgument(ClassFile cf, String str, int idx, Map<Integer, String> toResolve) {
+	private static Result<byte[], ParseError> parseInstructionArgument(ClassFile cf, ParseString str, int idx, Map<Integer, String> toResolve) {
 		// TODO: update to use constant pool format
-		if(str.startsWith("0x")) {
+		if(str.expect("0x")) {
 			try {
-				return ByteUtils.hexToBytes(str.substring(2));
+				return Result.of(ByteUtils.hexToBytes(str.next(str.remaining())));
 			}catch(IllegalArgumentException e) {
 				return null;
 			}
 		}else {
-			String[] spl = str.split(":");
-			switch(spl[0]) {
-				case "method":
-				{
-					if(spl.length != 4) return null;
-					return ClassFileUtils.getShortBytes(ClassFileUtils.getOrAppendMethodRef(cf,
-						ClassFileUtils.getOrAppendClass(cf, ClassFileUtils.getOrAppendUTF8(cf, spl[1])),
-						ClassFileUtils.getOrAppendNameAndType(cf,
-							ClassFileUtils.getOrAppendUTF8(cf, spl[2]),
-							ClassFileUtils.getOrAppendUTF8(cf, spl[3]))));
-				}
-				case "interfacemethod":
-				{
-					if(spl.length != 4) return null;
-					return ClassFileUtils.getShortBytes(ClassFileUtils.getOrAppendInterfaceMethodRef(cf,
-						ClassFileUtils.getOrAppendClass(cf, ClassFileUtils.getOrAppendUTF8(cf, spl[1])),
-						ClassFileUtils.getOrAppendNameAndType(cf,
-							ClassFileUtils.getOrAppendUTF8(cf, spl[2]),
-							ClassFileUtils.getOrAppendUTF8(cf, spl[3]))));
-				}
-				case "field":
-				{
-					if(spl.length != 4) return null;
-					return ClassFileUtils.getShortBytes(ClassFileUtils.getOrAppendFieldRef(cf,
-						ClassFileUtils.getOrAppendClass(cf, ClassFileUtils.getOrAppendUTF8(cf, spl[1])),
-						ClassFileUtils.getOrAppendNameAndType(cf,
-							ClassFileUtils.getOrAppendUTF8(cf, spl[2]),
-							ClassFileUtils.getOrAppendUTF8(cf, spl[3]))));
-				}
-				case "class":
-				{
-					if(spl.length != 2) return null;
-					return ClassFileUtils.getShortBytes(ClassFileUtils.getOrAppendClass(cf, ClassFileUtils.getOrAppendUTF8(cf, spl[1])));
-				}
-				case "label":
-				{
-					if(spl.length != 2) return null;
-					// Don't resolve immediately, as the label might not have appeared yet
-					toResolve.put(idx, spl[1]);
-					return ClassFileUtils.getShortBytes(0);
-				}
-				default:
-					return null;
-			}
+			// TODO: parse labels
+			var entry = ClassFileParser.parseConstantPoolEntry(cf, str);
+			if(entry.isErr()) return entry.up();
+			return Result.of(ClassFileUtils.getShortBytes(cf.getConstantPool().indexOf(entry.value())));
 		}
 	}
 
