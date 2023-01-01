@@ -76,15 +76,17 @@ public class ByteCodeParser {
 	}
 
 	private static Result<byte[], ParseError> parseInstructionArgument(ClassFile cf, ParseString str, int idx, Map<Integer, String> toResolve) {
-		// TODO: update to use constant pool format
 		if(str.expect("0x")) {
 			try {
 				return Result.of(ByteUtils.hexToBytes(str.next(str.remaining())));
 			}catch(IllegalArgumentException e) {
 				return null;
 			}
+		}else if(str.expect("label:")) {
+			String label = str.nextToken();
+			toResolve.put(idx, label);
+			return Result.of(new byte[0]); // To be resolved later
 		}else {
-			// TODO: parse labels
 			var entry = ClassFileParser.parseConstantPoolEntry(cf, str);
 			if(entry.isErr()) return entry.up();
 			return Result.of(ClassFileUtils.getShortBytes(cf.getConstantPool().indexOf(entry.value())));

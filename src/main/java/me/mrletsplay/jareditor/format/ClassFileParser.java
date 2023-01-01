@@ -26,6 +26,18 @@ import me.mrletsplay.mrcore.misc.classfile.MethodAccessFlag;
 import me.mrletsplay.mrcore.misc.classfile.attribute.Attribute;
 import me.mrletsplay.mrcore.misc.classfile.attribute.AttributeCode;
 import me.mrletsplay.mrcore.misc.classfile.attribute.AttributeRaw;
+import me.mrletsplay.mrcore.misc.classfile.attribute.AttributeStackMapTable;
+import me.mrletsplay.mrcore.misc.classfile.attribute.stackmap.StackMapAppendFrame;
+import me.mrletsplay.mrcore.misc.classfile.attribute.stackmap.StackMapChopFrame;
+import me.mrletsplay.mrcore.misc.classfile.attribute.stackmap.StackMapFrame;
+import me.mrletsplay.mrcore.misc.classfile.attribute.stackmap.StackMapFrameType;
+import me.mrletsplay.mrcore.misc.classfile.attribute.stackmap.StackMapSameFrame;
+import me.mrletsplay.mrcore.misc.classfile.attribute.stackmap.StackMapSameFrameExtended;
+import me.mrletsplay.mrcore.misc.classfile.attribute.stackmap.verification.VariableInfoGeneric;
+import me.mrletsplay.mrcore.misc.classfile.attribute.stackmap.verification.VariableInfoObject;
+import me.mrletsplay.mrcore.misc.classfile.attribute.stackmap.verification.VariableInfoUninitialized;
+import me.mrletsplay.mrcore.misc.classfile.attribute.stackmap.verification.VerificationType;
+import me.mrletsplay.mrcore.misc.classfile.attribute.stackmap.verification.VerificationTypeInfo;
 import me.mrletsplay.mrcore.misc.classfile.pool.entry.ConstantPoolClassEntry;
 import me.mrletsplay.mrcore.misc.classfile.pool.entry.ConstantPoolEntry;
 import me.mrletsplay.mrcore.misc.classfile.util.ClassFileUtils;
@@ -230,11 +242,11 @@ public class ClassFileParser {
 				ByteUtils.hexToBytes(tok));
 		}
 
-		if(a == null) {
-			switch(attr.getName()) {
-				case "Code":
-				{
-					try {
+		try {
+			if(a == null) {
+				switch(attr.getName()) {
+					case "Code":
+					{
 						AttributeCode code = new AttributeCode(cf);
 						var c = ByteCodeParser.parse(cf, str);
 						if(c.isErr()) {
@@ -265,13 +277,144 @@ public class ClassFileParser {
 						code.getCode().replace(c.value());
 						a = code;
 						break;
-					} catch (IOException e) {
-						throw new FriendlyException(e);
 					}
+					case "StackMapTable":
+					{
+						AttributeStackMapTable smt = new AttributeStackMapTable(cf);
+						List<StackMapFrame> frames = new ArrayList<>();
+
+						while(!str.stripLeading().end()) {
+							String type = str.nextToken();
+							if(str.end()) {
+								str.reset(m);
+								return Result.err(new ParseError("Unexpected end of input", m));
+							}
+
+							Result<ParseString, ParseError> block = readBlock(str);
+							if(block.isErr()) return block.up();
+
+							ParseString blk = block.value();
+
+							Map<String, String> properties = new HashMap<>();
+							Map<String, ParseString> blocks = new HashMap<>();
+
+							while(true) {
+								var pair = readPair(blk);
+								if(!pair.isErr()) {
+									var kv = pair.value();
+									properties.put(kv.getKey(), kv.getValue());
+									continue;
+								}
+
+								blk.stripLeading();
+								if(blk.end()) break;
+								String token = blk.nextToken();
+								if(token == null) {
+									str.reset(m);
+									return Result.err(new ParseError("Unexpected end of input", blk.mark()));
+								}
+
+								var subBlk = readBlock(blk);
+								if(subBlk.isErr()) {
+									str.reset(m);
+									return Result.err(new ParseError("Unexpected end of input", blk.mark()));
+								}
+
+								blocks.put(token, subBlk.value());
+							}
+
+							StackMapFrameType frameType;
+							try {
+								frameType = StackMapFrameType.valueOf(type.toUpperCase());
+							}catch(IllegalArgumentException e) {
+								str.reset(m);
+								return Result.err(new ParseError("Invalid stack map frame type", blk.mark()));
+							}
+
+							if(!properties.containsKey("offset")) {
+								str.reset(m);
+								return Result.err(new ParseError("No offset property", attr.getInfo().mark()));
+							}
+
+							int offset;
+							try {
+								offset = Integer.parseInt(properties.get("offset"));
+							}catch(NumberFormatException e) {
+								str.reset(m);
+								return Result.err(new ParseError("Invalid stack map frame offset", blk.mark()));
+							}
+
+							switch(frameType) {
+								case APPEND_FRAME:
+								{
+									if(!blocks.containsKey("types")) {
+										str.reset(m);
+										return Result.err(new ParseError("No types block", attr.getInfo().mark()));
+									}
+
+									var types = readTypes(cf, str);
+									if(types.isErr()) {
+										str.reset(m);
+										return types.up();
+									}
+
+									frames.add(new StackMapAppendFrame(offset, types.value().toArray(VerificationTypeInfo[]::new)));
+									break;
+								}
+								case CHOP_FRAME:
+								{
+									if(!properties.containsKey("absent")) {
+										str.reset(m);
+										return Result.err(new ParseError("No absent property", attr.getInfo().mark()));
+									}
+
+									try {
+										frames.add(new StackMapChopFrame(offset, Integer.parseInt(properties.get("offset"))));
+									}catch(NumberFormatException e) {
+										str.reset(m);
+										return Result.err(new ParseError("Invalid stack map frame offset", blk.mark()));
+									}
+									break;
+								}
+								case FULL_FRAME:
+								{
+									// TODO
+									break;
+								}
+								case SAME_LOCALS_1_STACK_ITEM_FRAME:
+								{
+									// TODO
+									break;
+								}
+								case SAME_LOCALS_1_STACK_ITEM_FRAME_EXTENDED:
+								{
+									// TODO
+									break;
+								}
+								case SAME_FRAME:
+								{
+									frames.add(new StackMapSameFrame(offset));
+									break;
+								}
+								case SAME_FRAME_EXTENDED:
+								{
+									frames.add(new StackMapSameFrameExtended(offset));
+									break;
+								}
+								default:
+									break;
+							}
+						}
+
+						a = smt;
+						break;
+					}
+					default:
+						return Result.err(new ParseError("Invalid attribute contents", attr.getInfo().mark()));
 				}
-				default:
-					return Result.err(new ParseError("Invalid attribute contents", attr.getInfo().mark()));
 			}
+		}catch(IOException e) {
+			throw new FriendlyException(e);
 		}
 
 		List<Attribute> attrs = new ArrayList<>();
@@ -288,6 +431,67 @@ public class ClassFileParser {
 		}
 
 		return Result.of(a);
+	}
+
+	private static Result<List<VerificationTypeInfo>, ParseError> readTypes(ClassFile cf, ParseString str) {
+		int m = str.mark();
+		List<VerificationTypeInfo> types = new ArrayList<>();
+		while(true) {
+			str.stripLeading();
+			if(str.end()) return Result.of(types);
+
+			String token = str.nextToken();
+			VerificationTypeInfo type = parseType(cf, token);
+			if(type == null) {
+				int mark = str.mark();
+				str.reset(m);
+				return Result.err(new ParseError("Invalid type", mark));
+			}
+
+			types.add(type);
+		}
+	}
+
+	private static VerificationTypeInfo parseType(ClassFile cf, String str) {
+		String[] spl = str.split(":");
+		VerificationType type;
+		try {
+			type = VerificationType.valueOf(spl[0].toUpperCase());
+		}catch(IllegalArgumentException e) {
+			return null;
+		}
+
+		switch(type) {
+			case DOUBLE:
+			case FLOAT:
+			case INTEGER:
+			case LONG:
+			case NULL:
+			case TOP:
+			case UNINITIALIZED_THIS:
+				if(spl.length != 1) return null;
+				return new VariableInfoGeneric(type);
+			case OBJECT:
+				if(spl.length != 2) return null;
+				return new VariableInfoObject(cf.getConstantPool().getEntry(ClassFileUtils.getOrAppendClass(cf, ClassFileUtils.getOrAppendUTF8(cf, spl[1]))).as(ConstantPoolClassEntry.class));
+			case UNINITIALIZED_VARIABLE:
+				if(spl.length != 2) return null;
+				String offsetStr = spl[1];
+				int offset;
+				try {
+					if(!offsetStr.startsWith("0x")) {
+						offset = Integer.parseInt(offsetStr);
+					}else {
+						byte[] bytes = ByteUtils.hexToBytes(offsetStr);
+						offset = (bytes[0] << 8) | bytes[1];
+					}
+				}catch(IllegalArgumentException e) {
+					return null;
+				}
+				return new VariableInfoUninitialized(offset);
+			default:
+				throw new IllegalArgumentException("Unsupported type");
+		}
 	}
 
 	private static Result<Map.Entry<String, String>, ParseError> readPair(ParseString str) {
