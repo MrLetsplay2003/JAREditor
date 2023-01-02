@@ -56,6 +56,7 @@ public class ClassFileFormatter {
 
 		b.append("constantpool {\n");
 		for(ConstantPoolEntry e : cf.getConstantPool().getEntries()) {
+			if(e == null) continue;
 			b.append(indent(1)).append(formatConstantPoolEntry(cf, e)).append("\n");
 		}
 		b.append("}\n\n");
