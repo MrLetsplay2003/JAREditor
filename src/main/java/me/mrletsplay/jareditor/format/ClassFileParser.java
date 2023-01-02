@@ -19,6 +19,7 @@ import me.mrletsplay.mrcore.misc.ByteUtils;
 import me.mrletsplay.mrcore.misc.EnumFlagCompound;
 import me.mrletsplay.mrcore.misc.FriendlyException;
 import me.mrletsplay.mrcore.misc.Result;
+import me.mrletsplay.mrcore.misc.classfile.ClassAccessFlag;
 import me.mrletsplay.mrcore.misc.classfile.ClassField;
 import me.mrletsplay.mrcore.misc.classfile.ClassFile;
 import me.mrletsplay.mrcore.misc.classfile.ClassMethod;
@@ -31,8 +32,11 @@ import me.mrletsplay.mrcore.misc.classfile.attribute.stackmap.StackMapAppendFram
 import me.mrletsplay.mrcore.misc.classfile.attribute.stackmap.StackMapChopFrame;
 import me.mrletsplay.mrcore.misc.classfile.attribute.stackmap.StackMapFrame;
 import me.mrletsplay.mrcore.misc.classfile.attribute.stackmap.StackMapFrameType;
+import me.mrletsplay.mrcore.misc.classfile.attribute.stackmap.StackMapFullFrame;
 import me.mrletsplay.mrcore.misc.classfile.attribute.stackmap.StackMapSameFrame;
 import me.mrletsplay.mrcore.misc.classfile.attribute.stackmap.StackMapSameFrameExtended;
+import me.mrletsplay.mrcore.misc.classfile.attribute.stackmap.StackMapSameLocals1StackItemFrame;
+import me.mrletsplay.mrcore.misc.classfile.attribute.stackmap.StackMapSameLocals1StackItemFrameExtended;
 import me.mrletsplay.mrcore.misc.classfile.attribute.stackmap.verification.VariableInfoGeneric;
 import me.mrletsplay.mrcore.misc.classfile.attribute.stackmap.verification.VariableInfoObject;
 import me.mrletsplay.mrcore.misc.classfile.attribute.stackmap.verification.VariableInfoUninitialized;
@@ -57,7 +61,7 @@ public class ClassFileParser {
 
 		ParseString parse = new FullParseString(str);
 
-		List<ConstantPoolEntry> constantPool = null;
+		boolean hasConstantPool = false;
 		Map<String, String> properties = new HashMap<>();
 		List<ParserAttribute> attributes = new ArrayList<>();
 		List<ParserField> fields = new ArrayList<>();
@@ -77,10 +81,11 @@ public class ClassFileParser {
 			switch(token) {
 				case "constantpool":
 				{
+					cf.getConstantPool().clear();
 					var cp = readConstantPool(cf, parse);
 					if(cp.isErr()) return cp.up();
-					if(constantPool != null) return Result.err(new ParseError("Duplicate constant pool", parse.mark()));
-					constantPool = cp.value();
+					if(hasConstantPool) return Result.err(new ParseError("Duplicate constant pool", parse.mark()));
+					hasConstantPool = true;
 					continue;
 				}
 				case "attribute":
@@ -122,6 +127,23 @@ public class ClassFileParser {
 		}catch(NumberFormatException e) {
 			return Result.err(new ParseError("Invalid major/minor version", 0));
 		}
+
+		EnumFlagCompound<ClassAccessFlag> flags = EnumFlagCompound.noneOf(ClassAccessFlag.class);
+		String fStr = properties.get("flags");
+		if(fStr == null) return Result.err(new ParseError("Missing class access flags", 0));
+		String[] fArr = fStr.split(",");
+		for(String f : fArr) {
+			ClassAccessFlag fl = Arrays.stream(ClassAccessFlag.values())
+				.filter(flag -> flag.getName().equals(f))
+				.findFirst().orElse(null);
+			if(fl == null) return Result.err(new ParseError("Invalid class access flag '" + f + "'", 0));
+			flags.addFlag(fl);
+		}
+		cf.setAccessFlags(flags);
+
+		String name = properties.get("name");
+		if(name == null) return Result.err(new ParseError("Missing name", 0));
+		cf.setThisClass(ClassFileUtils.getOrAppendClass(cf, ClassFileUtils.getOrAppendUTF8(cf, name)));
 
 		String superclass = properties.get("superclass");
 		if(superclass == null) return Result.err(new ParseError("Missing superclass", 0));
@@ -352,7 +374,8 @@ public class ClassFileParser {
 										return Result.err(new ParseError("No types block", attr.getInfo().mark()));
 									}
 
-									var types = readTypes(cf, str);
+									ParseString typesBlock = blocks.get("types");
+									var types = readTypes(cf, typesBlock);
 									if(types.isErr()) {
 										str.reset(m);
 										return types.up();
@@ -369,7 +392,7 @@ public class ClassFileParser {
 									}
 
 									try {
-										frames.add(new StackMapChopFrame(offset, Integer.parseInt(properties.get("offset"))));
+										frames.add(new StackMapChopFrame(offset, Integer.parseInt(properties.get("absent"))));
 									}catch(NumberFormatException e) {
 										str.reset(m);
 										return Result.err(new ParseError("Invalid stack map frame offset", blk.mark()));
@@ -378,17 +401,58 @@ public class ClassFileParser {
 								}
 								case FULL_FRAME:
 								{
-									// TODO
+									if(!blocks.containsKey("locals") || !blocks.containsKey("stack")) {
+										str.reset(m);
+										return Result.err(new ParseError("No locals/stack block", attr.getInfo().mark()));
+									}
+
+									ParseString localsBlock = blocks.get("locals");
+									var locals = readTypes(cf, localsBlock);
+									if(locals.isErr()) {
+										str.reset(m);
+										return locals.up();
+									}
+
+									ParseString stackBlock = blocks.get("stack");
+									var stack = readTypes(cf, stackBlock);
+									if(stack.isErr()) {
+										str.reset(m);
+										return stack.up();
+									}
+
+									frames.add(new StackMapFullFrame(offset, locals.value().toArray(VerificationTypeInfo[]::new), stack.value().toArray(VerificationTypeInfo[]::new)));
 									break;
 								}
 								case SAME_LOCALS_1_STACK_ITEM_FRAME:
 								{
-									// TODO
+									if(!properties.containsKey("type")) {
+										str.reset(m);
+										return Result.err(new ParseError("No type property", attr.getInfo().mark()));
+									}
+
+									VerificationTypeInfo parsedType = parseType(cf, properties.get("type"));
+									if(parsedType == null) {
+										str.reset(m);
+										return Result.err(new ParseError("Invalid type", attr.getInfo().mark()));
+									}
+
+									frames.add(new StackMapSameLocals1StackItemFrame(offset, parsedType));
 									break;
 								}
 								case SAME_LOCALS_1_STACK_ITEM_FRAME_EXTENDED:
 								{
-									// TODO
+									if(!properties.containsKey("type")) {
+										str.reset(m);
+										return Result.err(new ParseError("No type property", attr.getInfo().mark()));
+									}
+
+									VerificationTypeInfo parsedType = parseType(cf, properties.get("type"));
+									if(parsedType == null) {
+										str.reset(m);
+										return Result.err(new ParseError("Invalid type", attr.getInfo().mark()));
+									}
+
+									frames.add(new StackMapSameLocals1StackItemFrameExtended(offset, parsedType));
 									break;
 								}
 								case SAME_FRAME:
@@ -406,6 +470,7 @@ public class ClassFileParser {
 							}
 						}
 
+						smt.setEntries(frames.toArray(StackMapFrame[]::new));
 						a = smt;
 						break;
 					}
@@ -512,7 +577,7 @@ public class ClassFileParser {
 		return Result.of(new AbstractMap.SimpleEntry<>(kv[0], kv[1]));
 	}
 
-	private static Result<List<ConstantPoolEntry>, ParseError> readConstantPool(ClassFile cf, ParseString str) {
+	private static Result<Void, ParseError> readConstantPool(ClassFile cf, ParseString str) {
 		int m = str.mark();
 		str.stripLeading();
 
@@ -522,7 +587,6 @@ public class ClassFileParser {
 			return block.up();
 		}
 
-		List<ConstantPoolEntry> entries = new ArrayList<>();
 		ParseString blk = block.value();
 		Result<ConstantPoolEntry, ParseError> err;
 		while(true) {
@@ -532,8 +596,6 @@ public class ClassFileParser {
 				err = en;
 				break;
 			}
-
-			entries.add(en.value());
 		}
 
 		if(!blk.end()) {
@@ -541,7 +603,7 @@ public class ClassFileParser {
 			return err.up();
 		}
 
-		return Result.of(entries);
+		return Result.of(null);
 	}
 
 	private static Result<ParserField, ParseError> readField(ParseString str) {
@@ -779,20 +841,18 @@ public class ClassFileParser {
 			str.reset(m);
 			return Result.err(new ParseError("Unexpected end of input", m));
 		}
-
 		str.advance();
 
 		i = 0;
 		while(i < str.remaining() && str.peek(i) != '}') i++;
 
+		String content = str.next(i);
 		if(str.end()) {
 			str.reset(m);
 			return Result.err(new ParseError("Unexpected end of input", m));
 		}
-
-		String content = str.next(i);
 		str.advance();
-		content = content.substring(1, content.length() - 1);
+
 		String[] spl = content.split(":");
 
 		int idx;
@@ -805,7 +865,7 @@ public class ClassFileParser {
 			}
 			case "field":
 			{
-				idx = ClassFileUtils.getOrAppendMethodRef(cf,
+				idx = ClassFileUtils.getOrAppendFieldRef(cf,
 					ClassFileUtils.getOrAppendClass(cf, ClassFileUtils.getOrAppendUTF8(cf, spl[0])),
 					ClassFileUtils.getOrAppendNameAndType(cf,
 						ClassFileUtils.getOrAppendUTF8(cf, spl[1]),
@@ -857,9 +917,9 @@ public class ClassFileParser {
 			}
 			case "nameandtype":
 			{
-				idx = ClassFileUtils.getOrAppendLong(cf, ClassFileUtils.getOrAppendNameAndType(cf,
+				idx = ClassFileUtils.getOrAppendNameAndType(cf,
 					ClassFileUtils.getOrAppendUTF8(cf, spl[0]),
-					ClassFileUtils.getOrAppendUTF8(cf, spl[1])));
+					ClassFileUtils.getOrAppendUTF8(cf, spl[1]));
 				break;
 			}
 			default:
