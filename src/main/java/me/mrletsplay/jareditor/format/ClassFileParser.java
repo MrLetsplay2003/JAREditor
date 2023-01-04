@@ -732,6 +732,11 @@ public class ClassFileParser {
 			}
 		}
 
+		if(info == null) {
+			str.reset(m);
+			return Result.err(new ParseError("Unexpected end of input", str.mark()));
+		}
+
 		return Result.of(new ParserAttribute(name, info, properties, attributes));
 	}
 

@@ -12,7 +12,6 @@ import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.image.Image;
 import javafx.stage.Stage;
-import me.mrletsplay.mrcore.misc.classfile.ClassFile;
 
 public class JAREditor extends Application {
 
@@ -20,8 +19,6 @@ public class JAREditor extends Application {
 
 	public static Path openFilePath;
 	public static FileSystem openFileSystem;
-
-	public static ClassFile editedClass;
 
 	@Override
 	public void start(Stage primaryStage) throws Exception {
@@ -40,14 +37,16 @@ public class JAREditor extends Application {
 		primaryStage.show();
 	}
 
-	public static void openFile(Path jarFilePath) {
-		openFilePath = jarFilePath;
+	public static void openFile(Path filePath) {
+		openFilePath = filePath;
 		try {
 			if(openFileSystem != null) {
 				openFileSystem.close();
 			}
 
-			openFileSystem = FileSystems.newFileSystem(jarFilePath, (ClassLoader) null);
+			if(!filePath.getFileName().toString().endsWith(".class")) {
+				openFileSystem = FileSystems.newFileSystem(filePath, (ClassLoader) null);
+			}
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
