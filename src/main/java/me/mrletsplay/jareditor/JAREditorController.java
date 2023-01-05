@@ -5,12 +5,8 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.FileSystem;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.List;
-import java.util.stream.Collectors;
-import java.util.stream.StreamSupport;
 
 import org.fxmisc.flowless.VirtualizedScrollPane;
 import org.fxmisc.richtext.CodeArea;
@@ -26,6 +22,7 @@ import javafx.stage.FileChooser;
 import javafx.stage.FileChooser.ExtensionFilter;
 import me.mrletsplay.jareditor.file.EditedFile;
 import me.mrletsplay.jareditor.file.EditorItem;
+import me.mrletsplay.jareditor.file.OpenedFile;
 import me.mrletsplay.jareditor.format.ClassFileFormatter;
 import me.mrletsplay.jareditor.format.ClassFileParser;
 import me.mrletsplay.jareditor.syntax.SyntaxHighlighting;
@@ -91,6 +88,11 @@ public class JAREditorController {
 	}
 
 	@FXML
+	void newFile(ActionEvent event) {
+
+	}
+
+	@FXML
 	void open(ActionEvent event) {
 		FileChooser ch = new FileChooser();
 		ch.getExtensionFilters().add(new ExtensionFilter("Java archives and classes", "*.jar", "*.war", "*.zip", "*.class"));
@@ -98,15 +100,12 @@ public class JAREditorController {
 		if(f == null) return;
 		Path jarFile = f.toPath();
 
-		JAREditor.openFile(jarFile);
+		OpenedFile opened = JAREditor.openFile(jarFile);
 
-		boolean isArchive = JAREditor.openFileSystem != null;
-
-		TreeItem<EditorItem> root = new TreeItem<>(new EditorItem(isArchive ? null : jarFile, jarFile.getFileName().toString()));
+		TreeItem<EditorItem> root = new TreeItem<>(opened.getRoot());
 		root.setExpanded(true);
 		treeFiles.setRoot(root);
-
-		if(isArchive) add(root, JAREditor.openFileSystem, JAREditor.openFileSystem.getPath("/"));
+		add(root);
 	}
 
 	@FXML
@@ -120,20 +119,24 @@ public class JAREditorController {
 
 		try {
 			String code = areaEdit.getText();
-			var p = ClassFileParser.parse(new ClassFile(new ByteArrayInputStream(edit.getOriginalContents())), code);
-			if(p.isErr()) {
-				Alert a = new Alert(AlertType.ERROR);
-				System.out.println(code.substring(p.getErr().getIndex()));
-				a.setContentText(p.getErr().toString());
-				a.show();
-				p.getErr().printStackTrace();
-				return;
+			if(edit.getItem().getPath().getFileName().toString().endsWith(".class")) {
+				var p = ClassFileParser.parse(new ClassFile(new ByteArrayInputStream(edit.getOriginalContents())), code);
+				if(p.isErr()) {
+					Alert a = new Alert(AlertType.ERROR);
+					System.out.println(code.substring(p.getErr().getIndex()));
+					a.setContentText(p.getErr().toString());
+					a.show();
+					p.getErr().printStackTrace();
+					return;
+				}
+				ClassFile cf = p.value();
+				ByteArrayOutputStream bOut = new ByteArrayOutputStream();
+				cf.write(bOut);
+				Files.write(item.getPath(), bOut.toByteArray());
+			}else {
+				Files.writeString(item.getPath(), code, StandardCharsets.UTF_8);
 			}
-			ClassFile cf = p.value();
-			ByteArrayOutputStream bOut = new ByteArrayOutputStream();
-			cf.write(bOut);
-			System.out.println(item.getPath());
-			Files.write(item.getPath(), bOut.toByteArray());
+			JAREditor.openedFile.flush();
 		} catch (IOException e) {
 			e.printStackTrace();
 			Alert a = new Alert(AlertType.ERROR);
@@ -142,25 +145,36 @@ public class JAREditorController {
 		}
 	}
 
-	private void add(TreeItem<EditorItem> item, FileSystem fs, Path p) {
-		try {
-			List<Path> children = StreamSupport.stream(Files.newDirectoryStream(p).spliterator(), false)
-				.sorted()
-				.collect(Collectors.toList());
+	@FXML
+	void saveAs(ActionEvent event) {
 
-			if(children.size() == 1 && Files.isDirectory(children.get(0))) {
-				Path c = children.get(0);
-				item.setValue(new EditorItem(c, item.getValue() + "/" + c.getFileName().toString()));
-				if(Files.isDirectory(c)) add(item, fs, c);
-			}else {
-				for(Path c : children) {
-					TreeItem<EditorItem> it = new TreeItem<>(new EditorItem(c, c.getFileName().toString()));
-					item.getChildren().add(it);
-					if(Files.isDirectory(c)) add(it, fs, c);
-				}
-			}
-		} catch (IOException e) {
-			e.printStackTrace();
+	}
+
+	@FXML
+	void saveArchive(ActionEvent event) {
+
+	}
+
+	@FXML
+	void saveArchiveAs(ActionEvent event) {
+
+	}
+
+	@FXML
+	void preferences(ActionEvent event) {
+
+	}
+
+	@FXML
+	void quit(ActionEvent event) {
+
+	}
+
+	public void add(TreeItem<EditorItem> item) {
+		for(EditorItem c : item.getValue().getChildren()) {
+			TreeItem<EditorItem> child = new TreeItem<EditorItem>(c);
+			item.getChildren().add(child);
+			add(child);
 		}
 	}
 

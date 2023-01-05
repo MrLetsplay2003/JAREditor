@@ -1,9 +1,6 @@
 package me.mrletsplay.jareditor;
 
-import java.io.IOException;
 import java.net.URL;
-import java.nio.file.FileSystem;
-import java.nio.file.FileSystems;
 import java.nio.file.Path;
 
 import javafx.application.Application;
@@ -12,13 +9,13 @@ import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.image.Image;
 import javafx.stage.Stage;
+import me.mrletsplay.jareditor.file.OpenedFile;
 
 public class JAREditor extends Application {
 
 	public static Stage stage;
 
-	public static Path openFilePath;
-	public static FileSystem openFileSystem;
+	public static OpenedFile openedFile;
 
 	@Override
 	public void start(Stage primaryStage) throws Exception {
@@ -37,19 +34,12 @@ public class JAREditor extends Application {
 		primaryStage.show();
 	}
 
-	public static void openFile(Path filePath) {
-		openFilePath = filePath;
-		try {
-			if(openFileSystem != null) {
-				openFileSystem.close();
-			}
-
-			if(!filePath.getFileName().toString().endsWith(".class")) {
-				openFileSystem = FileSystems.newFileSystem(filePath, (ClassLoader) null);
-			}
-		} catch (IOException e) {
-			e.printStackTrace();
+	public static OpenedFile openFile(Path filePath) {
+		if(openedFile != null) {
+			openedFile.close();
 		}
+
+		return openedFile = new OpenedFile(filePath);
 	}
 
 }
