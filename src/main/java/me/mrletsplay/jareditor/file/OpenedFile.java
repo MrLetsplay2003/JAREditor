@@ -26,7 +26,7 @@ public class OpenedFile {
 			}
 		}
 
-		root = new EditorItem(this, null, filePath.getFileName().toString());
+		root = new EditorItem(this, fileSystem == null ? filePath : null, filePath.getFileName().toString());
 		if(fileSystem != null) {
 			root = add(root, fileSystem.getPath("/"));
 		}
@@ -66,6 +66,10 @@ public class OpenedFile {
 
 	public FileSystem getFileSystem() {
 		return fileSystem;
+	}
+
+	public boolean isArchive() {
+		return fileSystem != null;
 	}
 
 	public void flush() {

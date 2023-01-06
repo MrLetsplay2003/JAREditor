@@ -15,6 +15,7 @@ import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Alert.AlertType;
+import javafx.scene.control.MenuItem;
 import javafx.scene.control.SplitPane;
 import javafx.scene.control.TreeItem;
 import javafx.scene.control.TreeView;
@@ -38,6 +39,12 @@ public class JAREditorController {
 
 	@FXML
 	private CodeArea areaEdit;
+
+	@FXML
+	private MenuItem saveArchiveItem;
+
+	@FXML
+	private MenuItem saveArchiveAsItem;
 
 	public void init() {
 		areaEdit = new CodeArea();
@@ -101,11 +108,15 @@ public class JAREditorController {
 		Path jarFile = f.toPath();
 
 		OpenedFile opened = JAREditor.openFile(jarFile);
+		saveArchiveItem.setDisable(!opened.isArchive());
+		saveArchiveAsItem.setDisable(!opened.isArchive());
 
 		TreeItem<EditorItem> root = new TreeItem<>(opened.getRoot());
 		root.setExpanded(true);
 		treeFiles.setRoot(root);
 		add(root);
+
+		areaEdit.replaceText("");
 	}
 
 	@FXML
@@ -117,9 +128,34 @@ public class JAREditorController {
 		EditedFile edit = item.getFile();
 		if(edit == null) return;
 
+		saveItem(edit, item.getPath());
+	}
+
+	@FXML
+	void saveAs(ActionEvent event) {
+		TreeItem<EditorItem> it = treeFiles.getSelectionModel().getSelectedItem();
+		if(it == null) return;
+
+		EditorItem item = it.getValue();
+		EditedFile edit = item.getFile();
+		if(edit == null) return;
+
+		FileChooser ch = new FileChooser();
+		ch.getExtensionFilters().add(new ExtensionFilter("Java classes", "*.class"));
+		ch.getExtensionFilters().add(new ExtensionFilter("All files", "*.*"));
+		File f = ch.showSaveDialog(JAREditor.stage);
+		if(f == null) return;
+		Path savePath = f.toPath();
+
+		saveItem(edit, savePath);
+	}
+
+	private void saveItem(EditedFile edit, Path savePath) {
+		EditorItem item = edit.getItem();
+
 		try {
 			String code = areaEdit.getText();
-			if(edit.getItem().getPath().getFileName().toString().endsWith(".class")) {
+			if(item.getPath().getFileName().toString().endsWith(".class")) {
 				var p = ClassFileParser.parse(new ClassFile(new ByteArrayInputStream(edit.getOriginalContents())), code);
 				if(p.isErr()) {
 					Alert a = new Alert(AlertType.ERROR);
@@ -132,9 +168,9 @@ public class JAREditorController {
 				ClassFile cf = p.value();
 				ByteArrayOutputStream bOut = new ByteArrayOutputStream();
 				cf.write(bOut);
-				Files.write(item.getPath(), bOut.toByteArray());
+				Files.write(savePath, bOut.toByteArray());
 			}else {
-				Files.writeString(item.getPath(), code, StandardCharsets.UTF_8);
+				Files.writeString(savePath, code, StandardCharsets.UTF_8);
 			}
 			JAREditor.openedFile.flush();
 		} catch (IOException e) {
@@ -143,11 +179,6 @@ public class JAREditorController {
 			a.setContentText(e.toString());
 			a.show();
 		}
-	}
-
-	@FXML
-	void saveAs(ActionEvent event) {
-
 	}
 
 	@FXML
