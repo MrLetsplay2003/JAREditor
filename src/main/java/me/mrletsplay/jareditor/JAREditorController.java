@@ -17,6 +17,7 @@ import javafx.scene.control.Alert;
 import javafx.scene.control.Alert.AlertType;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.SplitPane;
+import javafx.scene.control.TextInputDialog;
 import javafx.scene.control.TreeItem;
 import javafx.scene.control.TreeView;
 import javafx.stage.FileChooser;
@@ -96,7 +97,19 @@ public class JAREditorController {
 
 	@FXML
 	void newFile(ActionEvent event) {
+		OpenedFile opened = JAREditor.openedFile;
+		if(opened == null || !opened.isArchive()) return;
 
+		TextInputDialog dialog = new TextInputDialog();
+		dialog.setTitle("Create file");
+		dialog.setHeaderText("Create file");
+		dialog.setContentText("Enter the path of the new file");
+
+		String filePath = dialog.showAndWait().orElse(null);
+		if(filePath == null) return;
+
+		Path path = opened.getFileSystem().getPath(filePath);
+		// TODO: Create file, update tree
 	}
 
 	@FXML
@@ -203,7 +216,7 @@ public class JAREditorController {
 
 	public void add(TreeItem<EditorItem> item) {
 		for(EditorItem c : item.getValue().getChildren()) {
-			TreeItem<EditorItem> child = new TreeItem<EditorItem>(c);
+			TreeItem<EditorItem> child = new TreeItem<>(c);
 			item.getChildren().add(child);
 			add(child);
 		}
